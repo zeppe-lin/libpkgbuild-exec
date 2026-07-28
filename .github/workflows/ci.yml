@@ -1,0 +1,68 @@
+# SPDX-FileCopyrightText: 2026 Alexandr Savca
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [shared, static]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          g++ meson ninja-build pkg-config libssl-dev
+          libarchive-dev libcurl4-openssl-dev scdoc
+      - name: Checkout exact native authorities
+        run: |
+          git clone https://github.com/zeppe-lin/libpkgsource.git ../libpkgsource
+          git -C ../libpkgsource checkout 9bf2d1adf56050ed73bd4fdac8406b802daec9d5
+          git clone https://github.com/zeppe-lin/libpkgbuild.git ../libpkgbuild
+          git -C ../libpkgbuild checkout 4fbe346fb08459ca56b0096eb54505130ea17244
+          git clone https://github.com/zeppe-lin/libpkgfetch.git ../libpkgfetch
+          git -C ../libpkgfetch checkout dc9c489ecca224954fd58505b59fd1c5a7ed0abc
+          git clone https://github.com/zeppe-lin/libpkgexec.git ../libpkgexec
+          git -C ../libpkgexec checkout fb3dcadd20d484820c8be458cfe15e329109c794
+          git clone https://github.com/zeppe-lin/libpkgimage.git ../libpkgimage
+          git -C ../libpkgimage checkout e1f6dfd8cc4bfeb2f8da44345d8ec6368281c6e0
+      - name: Build exact native authorities
+        run: |
+          prefix="$GITHUB_WORKSPACE/dependencies-${{ matrix.mode }}"
+          export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
+          for project in libpkgsource libpkgbuild libpkgfetch libpkgexec libpkgimage; do
+            extra=
+            case $project in
+              libpkgsource) extra='-Dyaml_adapter=disabled -Dplanner_adapter=disabled' ;;
+              libpkgbuild) extra='-Dplanner_adapter=disabled' ;;
+            esac
+            meson setup "../$project/build-${{ matrix.mode }}" "../$project" \
+              --prefix="$prefix" \
+              --libdir=lib \
+              -Ddefault_library=${{ matrix.mode }} \
+              -Dlink_mode=${{ matrix.mode }} \
+              -Dtests=disabled \
+              -Dman_pages=disabled \
+              $extra
+            meson compile -C "../$project/build-${{ matrix.mode }}"
+            meson install -C "../$project/build-${{ matrix.mode }}"
+          done
+      - name: Configure
+        run: |
+          prefix="$GITHUB_WORKSPACE/dependencies-${{ matrix.mode }}"
+          PKG_CONFIG_PATH="$prefix/lib/pkgconfig" meson setup build \
+            -Ddefault_library=${{ matrix.mode }} \
+            -Dlink_mode=${{ matrix.mode }} \
+            -Dman_pages=enabled \
+            -Dtests=enabled
+      - name: Compile
+        run: meson compile -C build
+      - name: Test
+        run: |
+          prefix="$GITHUB_WORKSPACE/dependencies-${{ matrix.mode }}"
+          LD_LIBRARY_PATH="$prefix/lib" meson test -C build --print-errorlogs
