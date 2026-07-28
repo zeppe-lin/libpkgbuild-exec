@@ -10,7 +10,7 @@ option(
 option(
   'tests',
   type: 'feature',
-  value: 'disabled',
+  value: 'enabled',
   description: 'Build the adapter contract tests',
 )
 option(
