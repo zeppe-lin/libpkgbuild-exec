@@ -20,3 +20,8 @@ test(
   find_program('check_authority_contract.sh'),
   args: [meson.project_source_root()],
 )
+test(
+  'release metadata',
+  find_program('check_release_metadata.sh'),
+  args: [meson.project_source_root()],
+)
