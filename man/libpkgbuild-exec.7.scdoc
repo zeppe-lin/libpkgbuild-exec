@@ -1,0 +1,44 @@
+LIBPKGBUILD-EXEC(7)
+
+# NAME
+
+libpkgbuild-exec - native sealed build-execution adapter
+
+# DESCRIPTION
+
+*libpkgbuild-exec* admits one exact *libpkgbuild* request, one matching
+*libpkgfetch* source materialization, exact host trees for all sealed package
+inputs, and explicit execution coordinates. It translates that authority into
+a backend-neutral *libpkgexec* build request.
+
+Verified raw source objects are reopened, hashed again, staged under their
+exact declared local names, and exposed read-only. No archive extraction or
+source transformation is inferred.
+
+The build executes with a closed environment, fixed numeric credentials,
+complete output capture, and denied networking. The caller selects and owns
+the execution backend and the exact root view.
+
+After successful execution, the complete package output root is inspected
+without following symlinks. Version 0.1 encodes an uncompressed
+package-tar-v1 artifact, publishes it without replacing an existing name, and
+asks *libpkgimage* to inspect the published bytes with their expected complete
+SHA-256. Build success is sealed only when the normalized archive image equals
+the intended payload manifest.
+
+# FAILURE MODEL
+
+A failed execution produces a failed *libpkgbuild* result bound to the exact
+execution evidence. Post-execution inspection, encoding, publication, and
+verification failures are retained as typed result-sealing failures.
+Diagnostic text and host paths do not enter semantic identities.
+
+# AUTHORITY
+
+The library does not fetch sources, extract archives, discover collections,
+resolve dependencies, construct a Linux backend, install packages, execute
+lifecycle programs, or publish package state.
+
+# SEE ALSO
+
+libpkgbuild(7), libpkgexec(7), libpkgfetch(7), libpkgimage(7)
