@@ -24,7 +24,7 @@ libpkgbuild_exec = library(
   dependencies: public_deps + private_deps,
   install: true,
   version: meson.project_version(),
-  soversion: '0',
+  soversion: '1',
 )
 
 libpkgbuild_exec_dep = declare_dependency(
@@ -44,9 +44,9 @@ pkgconf.generate(
   description: 'Native sealed build execution adapter',
   subdirs: '.',
   requires: [
-    'libpkgbuild >= 1.0.0',
-    'libpkgfetch >= 0.1.0',
-    'libpkgexec >= 1.0.0',
+    'libpkgbuild >= 2.0.0',
+    'libpkgfetch >= 1.0.0',
+    'libpkgexec >= 1.3.0',
     'libpkgimage >= 0.3.0',
   ],
   requires_private: ['libarchive', 'libcrypto'],

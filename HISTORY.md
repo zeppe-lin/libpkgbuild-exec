@@ -1,3 +1,17 @@
+Version: 1.0.0
+Date: 2026-07-29
+
+ABI migration release for the generation-2 source/build closure.
+
+- Rebuilt admitted build sessions against `libpkgfetch 1.0.0`,
+  `libpkgbuild 2.0.0`, and `libpkgexec 1.3.0`.
+- Advanced the shared-library SONAME to `libpkgbuild-exec.so.1` because
+  admitted sessions and terminal results embed the changed fetch and build
+  authority values by value.
+- Preserved session admission, execution request derivation, artifact
+  inspection, result sealing, and identity domains.
+- Excluded source generation 1 from the runtime dependency closure.
+
 Version: 0.1.0
 Date: 2026-07-28
 
