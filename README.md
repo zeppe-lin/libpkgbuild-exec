@@ -1,4 +1,4 @@
-# libpkgbuild-exec 1.0.0
+# libpkgbuild-exec 1.1.0
 
 `libpkgbuild-exec` is the native build-execution adapter for Zeppe-Lin.
 It realizes one sealed `libpkgbuild` request through a caller-supplied,

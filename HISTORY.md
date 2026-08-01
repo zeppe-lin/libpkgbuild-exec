@@ -1,3 +1,13 @@
+Version: 1.1.0
+Date: 2026-08-01
+
+- Establish a canonical versioned codec for complete build-execution evidence.
+- Embed libpkgexec 1.4 execution records without duplicating execution schema.
+- Retain payload, artifact, archive-inspection, sealing, and diagnostic evidence.
+- Require exact build request, execution request, and backend authorities at decode.
+- Reject corruption, noncanonical bytes, and substituted semantic authorities.
+- Keep the libpkgbuild-exec SONAME at 1 and raise libpkgexec to 1.4.0.
+
 Version: 1.0.0
 Date: 2026-07-29
 
