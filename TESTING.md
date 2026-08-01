@@ -31,3 +31,15 @@ Qualify each dependency closure independently:
 ./ci/qualify.sh shared
 ./ci/qualify.sh static
 ```
+
+## Durable evidence codec
+
+The executor fixture is also run in codec-only mode. It produces real adapter
+results for successful artifact sealing, execution failure, and
+post-execution sealing failure, then proves exact canonical round trips.
+Negative cases cover record corruption, truncation, and substitution of the
+build request, execution request, or backend profile.
+
+The codec contract test additionally proves that decoding has no admitted
+session, filesystem path, backend invocation, preparation, or execution
+surface, and that installation metadata requires `libpkgexec >= 1.4.0`.

@@ -26,6 +26,14 @@ asks *libpkgimage* to inspect the published bytes with their expected complete
 SHA-256. Build success is sealed only when the normalized archive image equals
 the intended payload manifest.
 
+# DURABLE EVIDENCE
+
+The versioned build-execution codec retains the exact *libpkgexec* execution
+record and adapter-owned build, payload, artifact, archive-inspection, sealing,
+and diagnostic evidence. Decode requires the exact build request, execution
+request, and backend profile bodies. It does not reconstruct authorities from
+identity strings and performs no filesystem or execution effect.
+
 # FAILURE MODEL
 
 A failed execution produces a failed *libpkgbuild* result bound to the exact

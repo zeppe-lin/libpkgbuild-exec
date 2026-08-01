@@ -1,0 +1,46 @@
+LIBPKGBUILD_EXEC_RESULT_CODEC(3)
+
+# NAME
+
+encode_build_execution_result, decode_build_execution_result - retain and reopen exact native build-execution evidence
+
+# SYNOPSIS
+
+*#include <libpkgbuild-exec/result_codec.h>*
+
+*build_execution_result_encoding encode_build_execution_result(const build_execution_result& result);*
+
+*build_execution_result decode_build_execution_result(const build_execution_result_encoding& encoding, pkgbuild::build_request build_request, pkgexec::execution_request execution_request, pkgexec::backend_capability_profile backend);*
+
+# DESCRIPTION
+
+*encode_build_execution_result*() emits the canonical versioned record for one
+retained *build_execution_result*. The record embeds the canonical
+*libpkgexec* execution-result encoding and retains the corresponding build
+outcome, payload manifest, sealed artifact, archive-inspection receipt,
+result-sealing failure, and diagnostic evidence when present.
+
+*decode_build_execution_result*() requires the exact build request, execution
+request, and backend capability profile bodies. It verifies the whole-record
+checksum, delegates subordinate execution evidence to *libpkgexec*, rebuilds
+payload, artifact, receipt, and build results through their public factories,
+checks every retained identity, and requires canonical byte-for-byte
+re-encoding.
+
+The codec never serializes or reconstructs admitted sessions, source
+materializations, package-input trees, host paths, credentials, execution
+resources, or backend semantics. Identity strings are not semantic authority.
+Decoding performs no source staging, program execution, payload inspection,
+artifact publication, archive access, cleanup, or other mutation.
+
+# ERRORS
+
+Malformed, truncated, noncanonical, or internally inconsistent bytes raise
+*pkgbuild_exec::error* with *corrupt_encoding*. A valid record presented with
+a different build request, execution request, or backend profile raises
+*authority_mismatch*. Encoding a result that violates the adapter contract
+raises *inconsistent_result*.
+
+# SEE ALSO
+
+libpkgbuild-exec(7), pkgexec_result_codec(3), libpkgbuild(7), libpkgimage(7)

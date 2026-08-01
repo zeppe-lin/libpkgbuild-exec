@@ -34,3 +34,12 @@ meson test -C build --print-errorlogs
 ```
 
 Shared and static dependency closures are separate builds. See `TESTING.md`.
+
+## Durable evidence
+
+`libpkgbuild-exec` provides a versioned canonical codec for
+`build_execution_result`. It embeds `libpkgexec`'s execution-result record and
+retains the adapter-owned build, payload, artifact, inspection, sealing, and
+diagnostic evidence. Decode requires the exact build request, execution
+request, and backend profile bodies; it never reconstructs those authorities
+from identities.

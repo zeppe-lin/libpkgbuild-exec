@@ -13,4 +13,15 @@ if scdoc.found()
     install: true,
     install_dir: join_paths(get_option('mandir'), 'man7'),
   )
+
+  custom_target(
+    'libpkgbuild_exec_result_codec.3',
+    input: 'libpkgbuild_exec_result_codec.3.scdoc',
+    output: 'libpkgbuild_exec_result_codec.3',
+    command: [scdoc],
+    feed: true,
+    capture: true,
+    install: true,
+    install_dir: join_paths(get_option('mandir'), 'man3'),
+  )
 endif

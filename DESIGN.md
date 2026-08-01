@@ -113,3 +113,30 @@ artifact and seals a failed build result.
 Diagnostics are retained operational evidence. Stable result-sealing failure
 identity contains only the typed failure class, not diagnostic prose or host
 paths.
+
+## Durable build-execution evidence
+
+The durable record belongs to this adapter because it binds two independent
+owner results: exact `libpkgexec` process evidence and the corresponding
+`libpkgbuild` outcome, including post-execution artifact sealing evidence.
+The record embeds the canonical `libpkgexec 1.4` execution-result encoding and
+adds only adapter-owned fields.
+
+The record does not serialize a build request, execution request, backend
+profile, admitted session, source materialization, package-input tree, host
+path, credential policy, or execution resource. Decode requires the exact
+`pkgbuild::build_request`, `pkgexec::execution_request`, and
+`pkgexec::backend_capability_profile` bodies from their owning authorities.
+Identity strings alone are not rehydration authority.
+
+Successful records retain the complete payload manifest, sealed artifact, and
+archive-inspection receipt. Decode reconstructs payload entries and artifacts
+through public factories, requires the receipt to name the exact artifact
+bytes and payload entry count, rebuilds the `pkgbuild::build_result`, and
+checks both subordinate result identities. Failed execution and failed result
+sealing remain distinct shapes and reproduce their existing evidence domains.
+
+Diagnostic prose remains outside semantic build identity but is covered by the
+whole-record checksum. Every accepted record is re-encoded and must reproduce
+its original bytes. The codec performs no source staging, execution, payload
+inspection, artifact publication, archive reopening, cleanup, or mutation.
