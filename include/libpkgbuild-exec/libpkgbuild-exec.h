@@ -9,3 +9,4 @@
 #include <libpkgbuild-exec/error.h>
 #include <libpkgbuild-exec/executor.h>
 #include <libpkgbuild-exec/model.h>
+#include <libpkgbuild-exec/result_codec.h>

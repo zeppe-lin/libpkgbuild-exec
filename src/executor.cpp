@@ -6,6 +6,8 @@
 #include <libpkgbuild-exec/error.h>
 #include <libpkgimage/libarchive_backend.h>
 
+#include "result_identity.h"
+
 #include <archive.h>
 #include <archive_entry.h>
 #include <openssl/evp.h>
@@ -1217,31 +1219,6 @@ void verify_image(const pkgbuild::payload_manifest& manifest,
   }
 }
 
-pkgbuild::execution_evidence_identity execution_evidence_identity(
-    const pkgexec::execution_result& result)
-{
-  return pkgbuild::execution_evidence_identity::from_sha256(domain_hash(
-      "libpkgbuild-exec:execution-evidence:v1", result.identity().hex()));
-}
-
-pkgbuild::failure_evidence_identity execution_failure_identity(
-    const pkgexec::execution_result& result)
-{
-  return pkgbuild::failure_evidence_identity::from_sha256(domain_hash(
-      "libpkgbuild-exec:execution-failure:v1", result.identity().hex()));
-}
-
-pkgbuild::failure_evidence_identity sealing_failure_identity(
-    const pkgexec::execution_result& result,
-    result_sealing_failure_kind kind)
-{
-  std::string material(result.identity().hex());
-  material.push_back('\0');
-  material.append(to_string(kind));
-  return pkgbuild::failure_evidence_identity::from_sha256(domain_hash(
-      "libpkgbuild-exec:result-sealing-failure:v1", material));
-}
-
 std::optional<result_sealing_failure_kind> failure_kind(error_code code)
 {
   switch (code) {
@@ -1436,10 +1413,10 @@ build_execution_result execute(const admitted_build_session& session,
                 "execution backend returned evidence for another request");
   }
 
-  const auto evidence = execution_evidence_identity(execution);
+  const auto evidence = detail::execution_evidence_identity(execution);
   if (execution.status() != pkgexec::execution_status::succeeded) {
     auto build = pkgbuild::build_result::failed(
-        session.request(), evidence, execution_failure_identity(execution));
+        session.request(), evidence, detail::execution_failure_identity(execution));
     const std::string diagnostic = execution.diagnostic();
     return detail::executor_access::make(
         std::move(execution), std::move(build), std::nullopt,
@@ -1495,7 +1472,7 @@ build_execution_result execute(const admitted_build_session& session,
     }
     auto build = pkgbuild::build_result::failed(
         session.request(), evidence,
-        sealing_failure_identity(execution, *kind));
+        detail::sealing_failure_identity(execution, *kind));
     return detail::executor_access::make(
         std::move(execution), std::move(build), *kind, value.what(),
         std::nullopt);
@@ -1503,7 +1480,7 @@ build_execution_result execute(const admitted_build_session& session,
     constexpr auto kind =
         result_sealing_failure_kind::artifact_verification;
     auto build = pkgbuild::build_result::failed(
-        session.request(), evidence, sealing_failure_identity(execution, kind));
+        session.request(), evidence, detail::sealing_failure_identity(execution, kind));
     return detail::executor_access::make(
         std::move(execution), std::move(build), kind, value.what(),
         std::nullopt);

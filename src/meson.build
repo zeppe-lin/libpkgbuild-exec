@@ -6,6 +6,7 @@ public_headers = files(
   '../include/libpkgbuild-exec/error.h',
   '../include/libpkgbuild-exec/model.h',
   '../include/libpkgbuild-exec/executor.h',
+  '../include/libpkgbuild-exec/result_codec.h',
   '../include/libpkgbuild-exec/libpkgbuild-exec.h',
 )
 public_deps = [
@@ -18,7 +19,7 @@ private_deps = [libarchive_dep, libcrypto_dep]
 
 libpkgbuild_exec = library(
   'pkgbuild-exec',
-  ['error.cpp', 'model.cpp', 'executor.cpp'],
+  ['error.cpp', 'model.cpp', 'result_identity.cpp', 'result_codec.cpp', 'executor.cpp'],
   cpp_args: ['-D_FILE_OFFSET_BITS=64'],
   include_directories: public_inc,
   dependencies: public_deps + private_deps,
@@ -46,7 +47,7 @@ pkgconf.generate(
   requires: [
     'libpkgbuild >= 2.0.0',
     'libpkgfetch >= 1.0.0',
-    'libpkgexec >= 1.3.0',
+    'libpkgexec >= 1.4.0',
     'libpkgimage >= 0.3.0',
   ],
   requires_private: ['libarchive', 'libcrypto'],

@@ -23,6 +23,9 @@ std::string_view to_string(error_code value) noexcept
     case error_code::artifact_publication_failed: return "artifact-publication-failed";
     case error_code::artifact_verification_failed: return "artifact-verification-failed";
     case error_code::artifact_cleanup_failed: return "artifact-cleanup-failed";
+    case error_code::inconsistent_result: return "inconsistent-result";
+    case error_code::corrupt_encoding: return "corrupt-encoding";
+    case error_code::authority_mismatch: return "authority-mismatch";
   }
   return "unknown";
 }

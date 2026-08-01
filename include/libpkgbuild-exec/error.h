@@ -26,6 +26,9 @@ enum class error_code {
   artifact_publication_failed,
   artifact_verification_failed,
   artifact_cleanup_failed,
+  inconsistent_result,
+  corrupt_encoding,
+  authority_mismatch,
 };
 
 [[nodiscard]] std::string_view to_string(error_code value) noexcept;

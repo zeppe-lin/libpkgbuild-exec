@@ -20,7 +20,10 @@
 
 namespace pkgbuild_exec {
 
-namespace detail { class executor_access; }
+namespace detail {
+class codec_access;
+class executor_access;
+}
 
 /*! \brief Stable class of a post-execution result-sealing failure. */
 enum class result_sealing_failure_kind {
@@ -115,6 +118,7 @@ public:
   artifact_inspection() const noexcept;
 
 private:
+  friend class detail::codec_access;
   friend class detail::executor_access;
   build_execution_result(
       pkgexec::execution_result execution,
