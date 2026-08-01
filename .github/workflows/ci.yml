@@ -22,13 +22,13 @@ jobs:
       - name: Checkout exact native authorities
         run: |
           git clone https://github.com/zeppe-lin/libpkgsource.git ../libpkgsource
-          git -C ../libpkgsource checkout 9bf2d1adf56050ed73bd4fdac8406b802daec9d5
+          git -C ../libpkgsource checkout fb48d79d1814959fbda0ac6740b26a76f50c1222
           git clone https://github.com/zeppe-lin/libpkgbuild.git ../libpkgbuild
-          git -C ../libpkgbuild checkout 4fbe346fb08459ca56b0096eb54505130ea17244
+          git -C ../libpkgbuild checkout fda7ccc10a9955eb7cdaf00c2a00104590fdd3d5
           git clone https://github.com/zeppe-lin/libpkgfetch.git ../libpkgfetch
-          git -C ../libpkgfetch checkout dc9c489ecca224954fd58505b59fd1c5a7ed0abc
+          git -C ../libpkgfetch checkout aee518a32a373c84f0270c05aed024fcbef8ac5e
           git clone https://github.com/zeppe-lin/libpkgexec.git ../libpkgexec
-          git -C ../libpkgexec checkout fb3dcadd20d484820c8be458cfe15e329109c794
+          git -C ../libpkgexec checkout 16000a60ea18774d82008c2d67bbd06050a79978
           git clone https://github.com/zeppe-lin/libpkgimage.git ../libpkgimage
           git -C ../libpkgimage checkout e1f6dfd8cc4bfeb2f8da44345d8ec6368281c6e0
       - name: Build exact native authorities
