@@ -172,10 +172,10 @@ std::string environment_value(const pkgexec::environment_policy& environment,
   return found->value();
 }
 
-pkgexec::backend_capability_profile capabilities()
+pkgexec::backend_capability_profile capabilities(char seed = 'a')
 {
   return pkgexec::backend_capability_profile::seal(
-      pkgexec::backend_identity::from_sha256(std::string(64U, 'a')),
+      pkgexec::backend_identity::from_sha256(std::string(64U, seed)),
       {
           pkgexec::execution_guarantee::exact_interpreter,
           pkgexec::execution_guarantee::closed_environment,
@@ -665,6 +665,131 @@ void test_unsupported_payload_fails_sealing()
           "failed sealing published an artifact");
 }
 
+
+
+void require_codec_equal(
+    const pkgbuild_exec::build_execution_result& expected,
+    const pkgbuild_exec::build_execution_result& observed)
+{
+  require(observed.execution().identity() == expected.execution().identity(),
+          "codec changed execution evidence");
+  require(observed.build().identity() == expected.build().identity(),
+          "codec changed build evidence");
+  require(observed.sealing_failure() == expected.sealing_failure(),
+          "codec changed sealing failure evidence");
+  require(observed.diagnostic() == expected.diagnostic(),
+          "codec changed diagnostic evidence");
+  require(observed.artifact_inspection().has_value() ==
+              expected.artifact_inspection().has_value(),
+          "codec changed artifact inspection presence");
+  if (expected.artifact_inspection()) {
+    require(observed.artifact_inspection()->identity() ==
+                expected.artifact_inspection()->identity(),
+            "codec changed artifact inspection evidence");
+  }
+}
+
+pkgbuild_exec::build_execution_result roundtrip(
+    const pkgbuild_exec::build_execution_result& result)
+{
+  const auto encoding = pkgbuild_exec::encode_build_execution_result(result);
+  auto decoded = pkgbuild_exec::decode_build_execution_result(
+      encoding, result.build().request(), result.execution().request(),
+      result.execution().backend());
+  require_codec_equal(result, decoded);
+  require(pkgbuild_exec::encode_build_execution_result(decoded) == encoding,
+          "build-execution encoding is not deterministic");
+  return decoded;
+}
+
+pkgbuild::build_request different_build_request(
+    const fixture_owner::state& state)
+{
+  std::vector<pkgbuild::materialized_source> materials;
+  for (const auto& input : state.source.recipe().sources()) {
+    materials.push_back(pkgbuild::materialized_source::verify(
+        input, pkgbuild::sha256_digest(input.content_digest().hex())));
+  }
+  return pkgbuild::build_request::seal(
+      state.source, std::move(materials), state.inputs,
+      pkgsource::architecture_reference("x86_64"),
+      pkgsource::architecture_reference("x86_64"),
+      pkgbuild::build_policy::make(
+          pkgbuild::environment_policy::hermetic(5, 0022, 1700000000)));
+}
+
+void test_result_codec()
+{
+  fixture_owner success_owner("codec-success");
+  fixture_backend succeeding(backend_mode::succeed);
+  auto success = pkgbuild_exec::execute(
+      success_owner.get().session("success"), succeeding);
+  auto decoded_success = roundtrip(success);
+  require(decoded_success.build().payload() &&
+              decoded_success.build().artifact() &&
+              decoded_success.artifact_inspection(),
+          "codec lost successful artifact evidence");
+
+  fixture_owner execution_owner("codec-execution-failure");
+  fixture_backend failing(backend_mode::fail);
+  auto execution_failure = pkgbuild_exec::execute(
+      execution_owner.get().session("failure"), failing);
+  (void)roundtrip(execution_failure);
+
+  fixture_owner sealing_owner("codec-sealing-failure");
+  fixture_backend unsupported(backend_mode::unsupported_payload);
+  auto sealing_failure = pkgbuild_exec::execute(
+      sealing_owner.get().session("sealing"), unsupported);
+  (void)roundtrip(sealing_failure);
+
+  const auto encoding =
+      pkgbuild_exec::encode_build_execution_result(success);
+
+  auto corrupted = encoding;
+  corrupted[corrupted.size() / 2U] ^= 0x01U;
+  expect_error(pkgbuild_exec::error_code::corrupt_encoding, [&] {
+    (void)pkgbuild_exec::decode_build_execution_result(
+        corrupted, success.build().request(), success.execution().request(),
+        success.execution().backend());
+  });
+
+  auto truncated = encoding;
+  truncated.pop_back();
+  expect_error(pkgbuild_exec::error_code::corrupt_encoding, [&] {
+    (void)pkgbuild_exec::decode_build_execution_result(
+        truncated, success.build().request(), success.execution().request(),
+        success.execution().backend());
+  });
+
+  expect_error(pkgbuild_exec::error_code::authority_mismatch, [&] {
+    (void)pkgbuild_exec::decode_build_execution_result(
+        encoding, different_build_request(success_owner.get()),
+        success.execution().request(), success.execution().backend());
+  });
+
+  auto other_execution_request = pkgexec::execution_request::seal(
+      success.execution().request().program(),
+      pkgexec::execution_purpose::check(),
+      success.execution().request().interpreter(),
+      success.execution().request().root_view(),
+      success.execution().request().resources(),
+      success.execution().request().environment(),
+      success.execution().request().credentials(),
+      success.execution().request().limits(),
+      success.execution().request().cancellation());
+  expect_error(pkgbuild_exec::error_code::authority_mismatch, [&] {
+    (void)pkgbuild_exec::decode_build_execution_result(
+        encoding, success.build().request(), other_execution_request,
+        success.execution().backend());
+  });
+
+  expect_error(pkgbuild_exec::error_code::authority_mismatch, [&] {
+    (void)pkgbuild_exec::decode_build_execution_result(
+        encoding, success.build().request(), success.execution().request(),
+        capabilities('b'));
+  });
+}
+
 void test_backend_contract_violations()
 {
   fixture_owner owner("backend-contract");
@@ -681,9 +806,14 @@ void test_backend_contract_violations()
 
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
   try {
+    if (argc == 2 && std::string_view(argv[1]) == "--codec") {
+      test_result_codec();
+      return 0;
+    }
+    require(argc == 1, "usage: executor-test [--codec]");
     test_prepare_contract();
     test_source_revalidation();
     test_unsafe_layout_rejected();
@@ -694,6 +824,7 @@ int main()
     test_publication_is_non_replacing();
     test_unsupported_payload_fails_sealing();
     test_backend_contract_violations();
+    test_result_codec();
   } catch (const std::exception& value) {
     std::cerr << value.what() << '\n';
     return 1;

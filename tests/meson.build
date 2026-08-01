@@ -7,6 +7,11 @@ executor_test = executable(
   dependencies: libpkgbuild_exec_dep,
 )
 test('build execution authority', executor_test)
+test(
+  'durable build evidence codec',
+  executor_test,
+  args: ['--codec'],
+)
 
 headers_test = executable(
   'public-headers-test',
@@ -23,5 +28,11 @@ test(
 test(
   'release metadata',
   find_program('check_release_metadata.sh'),
+  args: [meson.project_source_root()],
+)
+
+test(
+  'codec contract',
+  find_program('check_codec_contract.sh'),
   args: [meson.project_source_root()],
 )

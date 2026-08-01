@@ -5,5 +5,6 @@
 #include <libpkgbuild-exec/executor.h>
 #include <libpkgbuild-exec/libpkgbuild-exec.h>
 #include <libpkgbuild-exec/model.h>
+#include <libpkgbuild-exec/result_codec.h>
 
 int main() { return 0; }
