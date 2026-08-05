@@ -10,9 +10,12 @@ meson=$root/meson.build
 # The adapter consumes sealed authorities and receives its backend.
 grep -q 'pkgbuild::build_request' "$api"
 grep -q 'pkgfetch::source_materialization' "$api"
+grep -q 'pkgbuild::build_input_identity' "$api"
+grep -q 'pkgexec::resource_identity' "$api"
+! grep -R -q 'input_tree_identity\|materialized_package_input' "$root/include" "$root/src"
 grep -q 'pkgexec::execution_backend' \
   "$root/include/libpkgbuild-exec/executor.h"
-grep -q 'pkgimage::archive_inspection_receipt' "$api"
+grep -q 'pkgbuild::image_adapter::build_image_authority' "$api"
 ! grep -R -q 'libpkgexec-linux' "$root/include" "$root/src" "$meson"
 
 # Source admission is byte-based, not pathname-shaped authority.
@@ -34,6 +37,8 @@ grep -q 'archive_write_set_format_pax_restricted' "$executor"
 grep -q '::link(path_.c_str(), destination.c_str())' "$executor"
 grep -q 'image_digest(artifact_digest.first)' "$executor"
 grep -q 'verify_published_binding' "$executor"
+grep -q 'build_image_authority::admit' "$executor"
+! grep -q 'void verify_image' "$executor"
 
 # No shell utility becomes an accidental execution or archive authority.
 if grep -R -E 'system\(|popen\(|execl?p?\(|/usr/bin/(tar|cp|install|ip)' \

@@ -289,9 +289,9 @@ pkgbuild::payload_entry_type decode_entry_type(std::uint8_t value)
 pkgbuild::artifact_encoding decode_artifact_encoding(std::uint8_t value)
 {
   if (value != static_cast<std::uint8_t>(
-                   pkgbuild::artifact_encoding::package_tar_v1))
+                   pkgbuild::artifact_encoding::package_tar))
     corrupt("build-execution encoding contains an unknown artifact encoding");
-  return pkgbuild::artifact_encoding::package_tar_v1;
+  return pkgbuild::artifact_encoding::package_tar;
 }
 
 pkgbuild::artifact_compression decode_artifact_compression(std::uint8_t value)
@@ -464,21 +464,24 @@ void validate_result(const build_execution_result& result)
     inconsistent("build outcome does not match execution and sealing evidence");
 
   if (result.execution().status() != pkgexec::execution_status::succeeded) {
-    if (result.sealing_failure() || result.artifact_inspection())
+    if (result.sealing_failure() || result.image_authority())
       inconsistent("failed execution carries post-execution evidence");
     if (result.diagnostic() != result.execution().diagnostic())
       inconsistent("failed execution diagnostic differs from execution evidence");
   } else if (result.sealing_failure()) {
-    if (result.artifact_inspection())
-      inconsistent("failed result sealing carries an inspection receipt");
+    if (result.image_authority())
+      inconsistent("failed result sealing carries build-image authority");
   } else {
     if (!result.diagnostic().empty())
       inconsistent("successful build carries a sealing diagnostic");
     if (!build.payload() || !build.artifact() ||
-        !result.artifact_inspection())
+        !result.image_authority())
       inconsistent("successful build lacks artifact evidence");
-    require_receipt_binding(*build.payload(), *build.artifact(),
-                            *result.artifact_inspection(), true);
+    require_receipt_binding(
+        *build.payload(), *build.artifact(),
+        result.image_authority()->image().receipt(), true);
+    if (result.image_authority()->build().identity() != build.identity())
+      inconsistent("build-image authority retains another build result");
   }
 
   auto expected = expected_build_result(
@@ -530,11 +533,12 @@ public:
       pkgbuild::build_result build,
       std::optional<result_sealing_failure_kind> sealing_failure,
       std::string diagnostic,
-      std::optional<pkgimage::archive_inspection_receipt> artifact_inspection)
+      std::optional<pkgbuild::image_adapter::build_image_authority>
+          image_authority)
   {
     return build_execution_result(
         std::move(execution), std::move(build), sealing_failure,
-        std::move(diagnostic), std::move(artifact_inspection));
+        std::move(diagnostic), std::move(image_authority));
   }
 };
 
@@ -582,9 +586,9 @@ build_execution_result_encoding encode_build_execution_result(
     output.identity(artifact.complete_digest().hex());
   }
 
-  output.boolean(result.artifact_inspection().has_value());
-  if (result.artifact_inspection())
-    encode_receipt(output, *result.artifact_inspection());
+  output.boolean(result.image_authority().has_value());
+  if (result.image_authority())
+    encode_receipt(output, result.image_authority()->image().receipt());
 
   const auto& payload = output.output();
   output.identity(sha256_hex(std::string_view(
@@ -718,9 +722,15 @@ build_execution_result decode_build_execution_result(
     if (build.identity().hex() != build_identity)
       corrupt("build result identity mismatch");
 
+    std::optional<pkgbuild::image_adapter::build_image_authority>
+        image_authority;
+    if (receipt)
+      image_authority =
+          pkgbuild::image_adapter::build_image_authority::restore(
+              build, *receipt);
     auto decoded = detail::codec_access::make(
         std::move(execution), std::move(build), sealing_failure,
-        std::move(diagnostic), std::move(receipt));
+        std::move(diagnostic), std::move(image_authority));
     validate_result(decoded);
     if (encode_build_execution_result(decoded) != encoding)
       corrupt("build-execution encoding is not canonical");

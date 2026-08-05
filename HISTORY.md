@@ -1,3 +1,12 @@
+Version: 2.0.0
+Date: 2026-08-05
+
+- Admit resolver-issued logical build/check inputs with explicit call-scoped resources.
+- Remove the forged package-input tree identity from the execution ABI.
+- Consume genuine libpkgfetch materialization directly from the source snapshot.
+- Delegate successful build/image admission to libpkgbuild-image.
+- Advance the shared-library SONAME to 2 for the corrected session ABI.
+
 Version: 1.1.0
 Date: 2026-08-01
 

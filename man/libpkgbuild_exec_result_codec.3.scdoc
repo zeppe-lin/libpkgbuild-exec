@@ -17,18 +17,19 @@ encode_build_execution_result, decode_build_execution_result - retain and reopen
 *encode_build_execution_result*() emits the canonical versioned record for one
 retained *build_execution_result*. The record embeds the canonical
 *libpkgexec* execution-result encoding and retains the corresponding build
-outcome, payload manifest, sealed artifact, archive-inspection receipt,
-result-sealing failure, and diagnostic evidence when present.
+outcome, payload manifest, sealed artifact, the archive-inspection receipt
+needed to restore exact build/image admission, result-sealing failure, and
+diagnostic evidence when present.
 
 *decode_build_execution_result*() requires the exact build request, execution
 request, and backend capability profile bodies. It verifies the whole-record
 checksum, delegates subordinate execution evidence to *libpkgexec*, rebuilds
 payload, artifact, receipt, and build results through their public factories,
-checks every retained identity, and requires canonical byte-for-byte
-re-encoding.
+restores the exact admitted build/image authority, checks every retained
+identity, and requires canonical byte-for-byte re-encoding.
 
 The codec never serializes or reconstructs admitted sessions, source
-materializations, package-input trees, host paths, credentials, execution
+materializations, package-input resources, host paths, credentials, execution
 resources, or backend semantics. Identity strings are not semantic authority.
 Decoding performs no source staging, program execution, payload inspection,
 artifact publication, archive access, cleanup, or other mutation.

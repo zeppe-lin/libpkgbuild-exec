@@ -19,7 +19,7 @@ libpkgexec execution backend
         |
 package-output inspection
         |
-package_tar_v1 encoding and non-replacing publication
+package_tar encoding and non-replacing publication
         |
 libpkgimage inspection of the published bytes
         |
@@ -44,7 +44,7 @@ A session is admitted only when:
 - every sealed package input has exactly one matching input-tree identity;
 - root, session, package-output, artifact, and package-input coordinates are
   absolute and do not overlap in ways that would mix authority with effects;
-- the output layout is `package_root_v1`;
+- the output layout is `package_root`;
 - artifact compression is explicitly `none`.
 
 Package-input tree identities are upstream authority. This adapter binds their
@@ -92,13 +92,13 @@ metadata and content digest are checked again while bytes are written. Path
 bindings and directories are rechecked for replacement during traversal.
 Sockets and all unsupported object types fail result sealing.
 
-`package_tar_v1` uses restricted pax and therefore represents modification
+`package_tar` uses restricted pax and therefore represents modification
 time at whole-second precision. The payload manifest is normalized to that
 representable precision before artifact encoding.
 
 ## Artifact publication and verification
 
-Version 0.1 writes only uncompressed `package_tar_v1`. The archive is encoded
+Version 0.1 writes only uncompressed `package_tar`. The archive is encoded
 in the destination directory under an unpublished temporary name, made
 read-only, synchronized, and hashed. Publication uses a same-filesystem hard
 link and fails if the final name already exists; existing artifact bytes are
@@ -130,10 +130,12 @@ path, credential policy, or execution resource. Decode requires the exact
 Identity strings alone are not rehydration authority.
 
 Successful records retain the complete payload manifest, sealed artifact, and
-archive-inspection receipt. Decode reconstructs payload entries and artifacts
-through public factories, requires the receipt to name the exact artifact
-bytes and payload entry count, rebuilds the `pkgbuild::build_result`, and
-checks both subordinate result identities. Failed execution and failed result
+archive-inspection receipt used to restore the exact
+`pkgbuild::image_adapter::build_image_authority`. Decode reconstructs payload
+entries and artifacts through public factories, requires the receipt to name
+the exact artifact bytes and payload entry count, rebuilds the
+`pkgbuild::build_result`, restores the admitted build/image pair, and checks
+both subordinate result identities. Failed execution and failed result
 sealing remain distinct shapes and reproduce their existing evidence domains.
 
 Diagnostic prose remains outside semantic build identity but is covered by the

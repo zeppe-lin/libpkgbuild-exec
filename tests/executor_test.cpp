@@ -4,6 +4,9 @@
 #include <libpkgbuild-exec/libpkgbuild-exec.h>
 
 #include <libpkgimage/libarchive_backend.h>
+#include <libpkgcatalog/libpkgcatalog.h>
+#include <libpkgresolve/libpkgresolve.h>
+#include <libpkgstate/libpkgstate.h>
 
 #include <openssl/evp.h>
 
@@ -96,7 +99,7 @@ pkgsource::source_snapshot source_snapshot(
 {
   using namespace pkgsource;
   return seal_source(
-      source_origin("recipe.yml"), source_syntax::recipe_yaml_v1,
+      source_origin("recipe.yml"),
       recipe_declaration(
           package_release(package_reference("fixture"), "1.0", 1),
           package_metadata("Fixture", std::nullopt,
@@ -123,39 +126,113 @@ pkgsource::source_snapshot source_snapshot(
                   requirement_subject(package_reference("checker")),
                   at("requirements.check[0]", 14)),
           },
-          {}, architecture_requirements({}, {}), at("$", 1)),
+          {},
+          architecture_requirements(
+              {architecture_reference("x86_64")},
+              {architecture_reference("x86_64")}),
+          at("$", 1),
+          program(program_language::posix_shell, "true\n")),
       profile_catalog::seal({}));
 }
 
-pkgbuild::materialized_package_input package_input(
-    pkgbuild::input_scope scope, const char* name, char seed)
+pkgsource::source_snapshot dependency_source(std::string name)
 {
-  const std::string hex(64U, seed);
-  const auto package = pkgsource::package_reference(name);
-  return pkgbuild::materialized_package_input(
-      pkgbuild::resolved_package_input::make(
-          scope, package, pkgsource::package_release(package, "1.0", 1),
-          pkgsource::source_snapshot_identity::from_sha256(hex),
-          pkgbuild::build_result_identity::from_sha256(hex),
-          pkgbuild::artifact_identity::from_sha256(hex)),
-      pkgbuild::input_tree_identity::from_sha256(hex));
+  using namespace pkgsource;
+  return seal_source(
+      source_origin(name + "/recipe.yml"),
+      recipe_declaration(
+          package_release(package_reference(name), "1.0", 1),
+          package_metadata(name, std::nullopt, std::nullopt, {"MIT"}),
+          {}, program(program_language::posix_shell, "true\n"), {}, {},
+          architecture_requirements(
+              {architecture_reference("x86_64")},
+              {architecture_reference("x86_64")}),
+          at("$", 1)),
+      profile_catalog::seal({}));
+}
+
+pkgstate::sha256_digest_bytes state_bytes(std::uint8_t seed)
+{
+  pkgstate::sha256_digest_bytes result{};
+  for (std::size_t index = 0; index < result.size(); ++index)
+    result[index] = static_cast<std::uint8_t>(seed + index);
+  return result;
+}
+
+template<typename Identity>
+Identity state_identity(std::uint8_t seed)
+{
+  return Identity::from_sha256(state_bytes(seed));
+}
+
+pkgstate::snapshot empty_state()
+{
+  return pkgstate::snapshot::make(pkgstate::state_target_binding::make(
+      state_identity<pkgstate::managed_target_identity>(1),
+      state_identity<pkgstate::state_store_identity>(2),
+      state_identity<pkgstate::root_view_identity>(3),
+      state_identity<pkgstate::state_backend_identity>(4),
+      state_identity<pkgstate::publication_domain_identity>(5)));
+}
+
+pkgresolve::resolution_result resolution(
+    std::string_view first_digest, std::string_view second_digest)
+{
+  using namespace pkgsource;
+  auto profiles = profile_catalog::seal({});
+  std::vector<pkgsource::source_snapshot> sources;
+  sources.push_back(source_snapshot(first_digest, second_digest));
+  sources.push_back(dependency_source("tool"));
+  sources.push_back(dependency_source("checker"));
+
+  pkgcatalog::collection_declaration declaration(
+      pkgcatalog::collection_reference("core"),
+      pkgcatalog::collection_provenance(
+          "/collections/core", std::nullopt,
+          declaration_provenance("catalog.yml", "collections[0]", 1, 1)),
+      std::move(sources));
+  std::vector<pkgcatalog::catalog_collection> collections;
+  collections.emplace_back(
+      0, pkgcatalog::seal_collection(std::move(declaration)));
+  auto catalog = pkgcatalog::catalog_snapshot::seal(
+      profiles, std::move(collections));
+
+  std::vector<pkgresolve::resolution_goal> goals;
+  goals.emplace_back(
+      requirement_scope::build(),
+      requirement_subject(package_reference("fixture")), "test-build");
+  goals.emplace_back(
+      requirement_scope::check(),
+      requirement_subject(package_reference("fixture")), "test-check");
+  auto request = pkgresolve::resolution_request::seal(
+      std::move(catalog), empty_state(),
+      pkgresolve::architecture_context(
+          architecture_reference("x86_64"),
+          architecture_reference("x86_64")),
+      std::move(goals), pkgresolve::resolution_policy());
+  return pkgresolve::resolve(std::move(request));
+}
+
+const pkgresolve::selected_package& subject(
+    const pkgresolve::resolution_result& resolved)
+{
+  for (const auto& selection : resolved.selections()) {
+    if (selection.environment() == pkgresolve::resolution_environment::target &&
+        selection.package().name() == "fixture")
+      return selection;
+  }
+  throw std::runtime_error("fixture resolution lacks build subject");
 }
 
 pkgbuild::build_request build_request(
-    const pkgsource::source_snapshot& source,
-    const std::vector<pkgbuild::materialized_package_input>& inputs)
+    const pkgresolve::resolution_result& resolved,
+    std::uint32_t parallelism = 4)
 {
-  std::vector<pkgbuild::materialized_source> materials;
-  for (const auto& input : source.recipe().sources()) {
-    materials.push_back(pkgbuild::materialized_source::verify(
-        input, pkgbuild::sha256_digest(input.content_digest().hex())));
-  }
   return pkgbuild::build_request::seal(
-      source, std::move(materials), inputs,
-      pkgsource::architecture_reference("x86_64"),
-      pkgsource::architecture_reference("x86_64"),
+      resolved, subject(resolved).identity(),
       pkgbuild::build_policy::make(
-          pkgbuild::environment_policy::hermetic(4, 0022, 1700000000)));
+          pkgbuild::environment_policy::hermetic(
+              parallelism, 0022, 1700000000)));
 }
 
 std::string environment_value(const pkgexec::environment_policy& environment,
@@ -384,19 +461,16 @@ public:
     write_file(root / "inputs/tool/tool", "tool tree\n", 0555);
     write_file(root / "inputs/checker/checker", "checker tree\n", 0555);
 
-    auto source = source_snapshot(sha256_text("source bytes\n"),
-                                  sha256_text("raw archive bytes\n"));
+    auto resolved = resolution(sha256_text("source bytes\n"),
+                               sha256_text("raw archive bytes\n"));
+    auto request = build_request(resolved);
+    auto source = request.source();
     auto materialization = pkgfetch::materialize(
         pkgfetch::materialization_request::seal(
             source, root / "local", root / "store"));
-    std::vector<pkgbuild::materialized_package_input> inputs{
-        package_input(pkgbuild::input_scope::build, "tool", 'c'),
-        package_input(pkgbuild::input_scope::check, "checker", 'd'),
-    };
-    auto request = build_request(source, inputs);
     value_ = std::make_unique<state>(state{
-        root, std::move(source), std::move(materialization),
-        std::move(inputs), std::move(request)});
+        root, std::move(resolved), std::move(source),
+        std::move(materialization), std::move(request)});
   }
 
   ~fixture_owner()
@@ -409,22 +483,25 @@ public:
 
   struct state final {
     fs::path root;
+    pkgresolve::resolution_result resolution;
     pkgsource::source_snapshot source;
     pkgfetch::source_materialization materialization;
-    std::vector<pkgbuild::materialized_package_input> inputs;
     pkgbuild::build_request request;
 
     pkgbuild_exec::admitted_build_session session(
         std::string name = "one") const
     {
-      std::vector<pkgbuild_exec::package_input_tree> trees{
-          {inputs[0].resolved().identity(), inputs[0].tree(),
-           root / "inputs/tool"},
-          {inputs[1].resolved().identity(), inputs[1].tree(),
-           root / "inputs/checker"},
-      };
+      std::vector<pkgbuild_exec::package_input_resource> resources;
+      for (const auto& input : request.inputs().inputs()) {
+        const char seed = input.scope() == pkgbuild::input_scope::build ? 'c' : 'd';
+        resources.push_back({
+            input.identity(),
+            pkgexec::resource_identity::from_sha256(std::string(64U, seed)),
+            root / "inputs" / input.package().name(),
+        });
+      }
       return pkgbuild_exec::admitted_build_session::admit(
-          request, materialization, std::move(trees),
+          request, materialization, std::move(resources),
           {
               pkgexec::root_view_identity::from_sha256(
                   std::string(64U, 'b')),
@@ -476,10 +553,10 @@ void test_prepare_contract()
               prepared.request.credentials().group_id() == ::getgid(),
           "prepared credentials differ from the session");
   require(prepared.request.limits().empty(),
-          "0.1 unexpectedly invented resource limits");
+          "adapter unexpectedly invented resource limits");
   require(prepared.request.cancellation().mode() ==
               pkgexec::cancellation_mode::disabled,
-          "0.1 unexpectedly invented cancellation");
+          "adapter unexpectedly invented cancellation");
   require(read_file(prepared.source_tree / "payload") == "source bytes\n",
           "source staging failed");
   require(read_file(prepared.source_tree / "archive.tar") ==
@@ -506,15 +583,17 @@ void test_unsafe_layout_rejected()
 {
   fixture_owner owner("unsafe-layout");
   const auto& state = owner.get();
-  std::vector<pkgbuild_exec::package_input_tree> trees{
-      {state.inputs[0].resolved().identity(), state.inputs[0].tree(),
+  std::vector<pkgbuild_exec::package_input_resource> resources{
+      {state.request.inputs().inputs()[0].identity(),
+       pkgexec::resource_identity::from_sha256(std::string(64U, 'c')),
        state.root / "inputs/tool"},
-      {state.inputs[1].resolved().identity(), state.inputs[1].tree(),
+      {state.request.inputs().inputs()[1].identity(),
+       pkgexec::resource_identity::from_sha256(std::string(64U, 'd')),
        state.root / "inputs/checker"},
   };
   expect_error(pkgbuild_exec::error_code::unsafe_path_layout, [&] {
     (void)pkgbuild_exec::admitted_build_session::admit(
-        state.request, state.materialization, trees,
+        state.request, state.materialization, resources,
         {
             pkgexec::root_view_identity::from_sha256(std::string(64U, 'b')),
             state.root / "root", state.root / "session",
@@ -532,13 +611,14 @@ void test_package_input_mismatch()
 {
   fixture_owner owner("input-mismatch");
   const auto& state = owner.get();
-  std::vector<pkgbuild_exec::package_input_tree> trees{
-      {state.inputs[0].resolved().identity(), state.inputs[0].tree(),
+  std::vector<pkgbuild_exec::package_input_resource> resources{
+      {state.request.inputs().inputs()[0].identity(),
+       pkgexec::resource_identity::from_sha256(std::string(64U, 'c')),
        state.root / "inputs/tool"},
   };
   expect_error(pkgbuild_exec::error_code::package_input_mismatch, [&] {
     (void)pkgbuild_exec::admitted_build_session::admit(
-        state.request, state.materialization, trees,
+        state.request, state.materialization, resources,
         {
             pkgexec::root_view_identity::from_sha256(std::string(64U, 'b')),
             state.root / "root", state.root / "session",
@@ -560,15 +640,17 @@ void test_credential_bounds()
   }
   fixture_owner owner("credential-bounds");
   const auto& state = owner.get();
-  std::vector<pkgbuild_exec::package_input_tree> trees{
-      {state.inputs[0].resolved().identity(), state.inputs[0].tree(),
+  std::vector<pkgbuild_exec::package_input_resource> resources{
+      {state.request.inputs().inputs()[0].identity(),
+       pkgexec::resource_identity::from_sha256(std::string(64U, 'c')),
        state.root / "inputs/tool"},
-      {state.inputs[1].resolved().identity(), state.inputs[1].tree(),
+      {state.request.inputs().inputs()[1].identity(),
+       pkgexec::resource_identity::from_sha256(std::string(64U, 'd')),
        state.root / "inputs/checker"},
   };
   expect_error(pkgbuild_exec::error_code::invalid_session, [&] {
     (void)pkgbuild_exec::admitted_build_session::admit(
-        state.request, state.materialization, trees,
+        state.request, state.materialization, resources,
         {
             pkgexec::root_view_identity::from_sha256(std::string(64U, 'b')),
             state.root / "root", state.root / "session",
@@ -610,7 +692,7 @@ void test_success_and_determinism()
   require(first.build().payload() &&
               first.build().payload()->entries().size() == 6U,
           "complete payload was not sealed");
-  require(first.build().artifact() && first.artifact_inspection(),
+  require(first.build().artifact() && first.image_authority(),
           "artifact evidence is incomplete");
   require(!first.sealing_failure() && first.diagnostic().empty(),
           "successful sealing retained a failure");
@@ -630,7 +712,7 @@ void test_success_and_determinism()
   require(first.build().artifact()->complete_digest() ==
               second.build().artifact()->complete_digest() &&
               read_file(first_path) == read_file(second_path),
-          "identical payloads produced different package_tar_v1 bytes");
+          "identical payloads produced different package_tar bytes");
   require(first.build() == second.build(),
           "effect coordinates contaminated build-result identity");
 }
@@ -679,12 +761,12 @@ void require_codec_equal(
           "codec changed sealing failure evidence");
   require(observed.diagnostic() == expected.diagnostic(),
           "codec changed diagnostic evidence");
-  require(observed.artifact_inspection().has_value() ==
-              expected.artifact_inspection().has_value(),
+  require(observed.image_authority().has_value() ==
+              expected.image_authority().has_value(),
           "codec changed artifact inspection presence");
-  if (expected.artifact_inspection()) {
-    require(observed.artifact_inspection()->identity() ==
-                expected.artifact_inspection()->identity(),
+  if (expected.image_authority()) {
+    require(observed.image_authority()->identity() ==
+                expected.image_authority()->identity(),
             "codec changed artifact inspection evidence");
   }
 }
@@ -705,17 +787,7 @@ pkgbuild_exec::build_execution_result roundtrip(
 pkgbuild::build_request different_build_request(
     const fixture_owner::state& state)
 {
-  std::vector<pkgbuild::materialized_source> materials;
-  for (const auto& input : state.source.recipe().sources()) {
-    materials.push_back(pkgbuild::materialized_source::verify(
-        input, pkgbuild::sha256_digest(input.content_digest().hex())));
-  }
-  return pkgbuild::build_request::seal(
-      state.source, std::move(materials), state.inputs,
-      pkgsource::architecture_reference("x86_64"),
-      pkgsource::architecture_reference("x86_64"),
-      pkgbuild::build_policy::make(
-          pkgbuild::environment_policy::hermetic(5, 0022, 1700000000)));
+  return build_request(state.resolution, 5);
 }
 
 void test_result_codec()
@@ -727,7 +799,7 @@ void test_result_codec()
   auto decoded_success = roundtrip(success);
   require(decoded_success.build().payload() &&
               decoded_success.build().artifact() &&
-              decoded_success.artifact_inspection(),
+              decoded_success.image_authority(),
           "codec lost successful artifact evidence");
 
   fixture_owner execution_owner("codec-execution-failure");

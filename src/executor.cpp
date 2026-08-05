@@ -3,6 +3,8 @@
 
 #include <libpkgbuild-exec/executor.h>
 
+#include <libpkgbuild-image/authority.h>
+
 #include <libpkgbuild-exec/error.h>
 #include <libpkgimage/libarchive_backend.h>
 
@@ -394,9 +396,9 @@ void stage_source_object(const pkgfetch::verified_source_object& object,
 }
 
 std::string package_input_name(
-    const pkgbuild::materialized_package_input& input)
+    const pkgbuild::build_input& input)
 {
-  return input.resolved().declared_package().name();
+  return input.package().name();
 }
 
 std::string join_input_names(const pkgbuild::build_request& request,
@@ -456,7 +458,7 @@ struct inode_key final {
 
 pkgbuild::payload_time payload_time(const file_stamp& value)
 {
-  // package_tar_v1 uses the restricted pax profile and therefore seals
+  // package_tar uses the restricted pax profile and therefore seals
   // modification times at whole-second precision.
   return {static_cast<std::int64_t>(value.modification.tv_sec), 0U};
 }
@@ -1013,14 +1015,14 @@ void encode_artifact(const inspected_payload& payload,
   archive* raw = archive_write_new();
   if (!raw) {
     throw error(error_code::artifact_encoding_failed,
-                "cannot allocate package_tar_v1 writer");
+                "cannot allocate package_tar writer");
   }
   std::unique_ptr<archive, decltype(&archive_write_free)> output(
       raw, archive_write_free);
   archive_require(archive_write_add_filter_none(output.get()), output.get(),
                   "select uncompressed artifact");
   archive_require(archive_write_set_format_pax_restricted(output.get()),
-                  output.get(), "select package_tar_v1 format");
+                  output.get(), "select package_tar format");
   archive_require(archive_write_set_bytes_per_block(output.get(), 512),
                   output.get(), "set artifact block size");
   archive_require(archive_write_set_bytes_in_last_block(output.get(), 512),
@@ -1030,13 +1032,13 @@ void encode_artifact(const inspected_payload& payload,
   archive_require(archive_write_open2(output.get(), &client, nullptr,
                                       archive_write_callback,
                                       archive_close_callback, nullptr),
-                  output.get(), "open package_tar_v1 writer");
+                  output.get(), "open package_tar writer");
 
   for (const auto& item : payload.manifest.entries()) {
     archive_entry* raw_entry = archive_entry_new();
     if (!raw_entry) {
       throw error(error_code::artifact_encoding_failed,
-                  "cannot allocate package_tar_v1 entry");
+                  "cannot allocate package_tar entry");
     }
     std::unique_ptr<archive_entry, decltype(&archive_entry_free)> entry(
         raw_entry, archive_entry_free);
@@ -1088,16 +1090,16 @@ void encode_artifact(const inspected_payload& payload,
     }
 
     archive_require(archive_write_header(output.get(), entry.get()),
-                    output.get(), "write package_tar_v1 header");
+                    output.get(), "write package_tar header");
     if (item.type() == pkgbuild::payload_entry_type::regular) {
       write_regular_payload(output.get(), regular_for(payload, item.path()));
     }
     archive_require(archive_write_finish_entry(output.get()), output.get(),
-                    "finish package_tar_v1 entry");
+                    "finish package_tar entry");
   }
 
   archive_require(archive_write_close(output.get()), output.get(),
-                  "close package_tar_v1 writer");
+                  "close package_tar writer");
   if (::fchmod(temporary.descriptor(), 0444) != 0 ||
       ::fsync(temporary.descriptor()) != 0) {
     throw error(error_code::artifact_encoding_failed,
@@ -1144,81 +1146,6 @@ pkgimage::complete_archive_digest image_digest(std::string_view hex)
   return pkgimage::complete_archive_digest::from_sha256(bytes);
 }
 
-bool same_entry_type(pkgbuild::payload_entry_type build,
-                     pkgimage::entry_type image) noexcept
-{
-  using build_type = pkgbuild::payload_entry_type;
-  using image_type = pkgimage::entry_type;
-  return (build == build_type::regular && image == image_type::regular) ||
-         (build == build_type::directory && image == image_type::directory) ||
-         (build == build_type::symlink && image == image_type::symlink) ||
-         (build == build_type::hardlink && image == image_type::hardlink) ||
-         (build == build_type::fifo && image == image_type::fifo) ||
-         (build == build_type::character_device &&
-          image == image_type::character_device) ||
-         (build == build_type::block_device &&
-          image == image_type::block_device);
-}
-
-void verify_image(const pkgbuild::payload_manifest& manifest,
-                  const pkgimage::package_image& image)
-{
-  if (image.entries().size() != manifest.entries().size()) {
-    throw error(error_code::artifact_verification_failed,
-                "archive image cardinality differs from the payload manifest");
-  }
-  for (std::size_t index = 0; index < image.entries().size(); ++index) {
-    const auto& observed = image.entries()[index];
-    const auto& expected = manifest.entries()[index];
-    auto mismatch = [&](std::string_view field) {
-      throw error(error_code::artifact_verification_failed,
-                  "archive image differs from the payload manifest at " +
-                      expected.path().string() + ": " + std::string(field));
-    };
-    if (observed.path.string() != expected.path().string()) mismatch("path");
-    if (!same_entry_type(expected.type(), observed.type)) mismatch("type");
-    if (observed.mode != expected.mode()) mismatch("mode");
-    if (observed.uid != expected.uid()) mismatch("uid");
-    if (observed.gid != expected.gid()) mismatch("gid");
-    if (observed.size != expected.size()) mismatch("size");
-    if (observed.mtime != expected.modification_time().seconds) mismatch("mtime");
-    if (observed.mtime_nanoseconds != expected.modification_time().nanoseconds)
-      mismatch("mtime-nanoseconds");
-    if (observed.symlink_target != expected.symlink_target())
-      mismatch("symlink-target");
-    if (observed.hardlink_target.has_value() !=
-            expected.hardlink_target().has_value() ||
-        (observed.hardlink_target &&
-         observed.hardlink_target->string() !=
-             expected.hardlink_target()->string())) {
-      throw error(error_code::artifact_verification_failed,
-                  "archive hard-link topology differs at " +
-                      expected.path().string());
-    }
-    if (observed.device.has_value() != expected.device().has_value() ||
-        (observed.device &&
-         (observed.device->major != expected.device()->major ||
-          observed.device->minor != expected.device()->minor))) {
-      throw error(error_code::artifact_verification_failed,
-                  "archive device identity differs at " +
-                      expected.path().string());
-    }
-    if (expected.regular_content()) {
-      if (!observed.regular_content ||
-          observed.regular_content->string() !=
-              "v1:sha256:" + expected.regular_content()->hex()) {
-        throw error(error_code::artifact_verification_failed,
-                    "archive regular content differs at " +
-                        expected.path().string());
-      }
-    } else if (observed.regular_content) {
-      throw error(error_code::artifact_verification_failed,
-                  "archive carries unexpected regular content at " +
-                      expected.path().string());
-    }
-  }
-}
-
 std::optional<result_sealing_failure_kind> failure_kind(error_code code)
 {
   switch (code) {
@@ -1237,19 +1164,18 @@ std::optional<result_sealing_failure_kind> failure_kind(error_code code)
   }
 }
 
-const package_input_tree& supplied_tree(
+const package_input_resource& supplied_resource(
     const admitted_build_session& session,
-    const pkgbuild::materialized_package_input& expected)
+    const pkgbuild::build_input& expected)
 {
   const auto found = std::find_if(
       session.package_inputs().begin(), session.package_inputs().end(),
-      [&](const package_input_tree& supplied) {
-        return supplied.input == expected.resolved().identity() &&
-               supplied.tree == expected.tree();
+      [&](const package_input_resource& supplied) {
+        return supplied.input == expected.identity();
       });
   if (found == session.package_inputs().end()) {
     throw error(error_code::package_input_mismatch,
-                "package-input tree vanished after session admission");
+                "package-input resource vanished after session admission");
   }
   return *found;
 }
@@ -1265,11 +1191,12 @@ public:
       pkgbuild::build_result build,
       std::optional<result_sealing_failure_kind> sealing_failure,
       std::string diagnostic,
-      std::optional<pkgimage::archive_inspection_receipt> artifact_inspection)
+      std::optional<pkgbuild::image_adapter::build_image_authority>
+          image_authority)
   {
     return build_execution_result(
         std::move(execution), std::move(build), sealing_failure,
-        std::move(diagnostic), std::move(artifact_inspection));
+        std::move(diagnostic), std::move(image_authority));
   }
 };
 
@@ -1325,18 +1252,14 @@ prepared_execution prepare(const admitted_build_session& session)
   materializations.emplace_back(source_identity, source_tree);
 
   for (const auto& expected : session.request().inputs().inputs()) {
-    const auto& supplied = supplied_tree(session, expected);
+    const auto& supplied = supplied_resource(session, expected);
     const auto role =
-        expected.resolved().scope() == pkgbuild::input_scope::build
+        expected.scope() == pkgbuild::input_scope::build
             ? pkgexec::resource_role::build_input_tree
             : pkgexec::resource_role::check_input_tree;
     const std::string name = package_input_name(expected);
     const auto slot = pkgexec::resource_slot::named(role, name);
-    std::string identity_material(expected.resolved().identity().hex());
-    identity_material.push_back('\0');
-    identity_material.append(expected.tree().hex());
-    const auto identity = resource_identity(
-        "libpkgbuild-exec:package-input-tree:v1", identity_material);
+    const auto& identity = supplied.resource;
     const std::string mount =
         std::string("/build/inputs/") +
         (role == pkgexec::resource_role::build_input_tree ? "build/" :
@@ -1448,19 +1371,19 @@ build_execution_result execute(const admitted_build_session& session,
                     "artifact bytes changed during independent inspection");
       }
       temporary.verify_published_binding();
-      verify_image(payload.manifest, inspected.image());
-
       auto artifact = pkgbuild::sealed_artifact::make(
-          pkgbuild::artifact_encoding::package_tar_v1,
+          pkgbuild::artifact_encoding::package_tar,
           session.compression(), artifact_digest.second,
           pkgbuild::sha256_digest(artifact_digest.first));
       auto build = pkgbuild::build_result::succeeded(
           session.request(), payload.manifest, std::move(artifact), evidence);
-      auto receipt = inspected.receipt();
+      auto authority =
+          pkgbuild::image_adapter::build_image_authority::admit(
+              build, inspected);
       temporary.retain();
       return detail::executor_access::make(
           std::move(execution), std::move(build), std::nullopt, {},
-          std::move(receipt));
+          std::move(authority));
     } catch (...) {
       temporary.rollback();
       throw;

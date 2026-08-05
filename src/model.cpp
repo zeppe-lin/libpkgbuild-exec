@@ -85,7 +85,7 @@ std::string_view to_string(result_sealing_failure_kind value) noexcept
 admitted_build_session::admitted_build_session(
     pkgbuild::build_request request,
     pkgfetch::source_materialization sources,
-    std::vector<package_input_tree> package_inputs,
+    std::vector<package_input_resource> package_inputs,
     session_paths paths,
     execution_identity identity,
     pkgbuild::artifact_compression compression)
@@ -98,26 +98,26 @@ admitted_build_session::admitted_build_session(
 admitted_build_session admitted_build_session::admit(
     pkgbuild::build_request request,
     pkgfetch::source_materialization sources,
-    std::vector<package_input_tree> package_inputs,
+    std::vector<package_input_resource> package_inputs,
     session_paths paths,
     execution_identity identity,
     pkgbuild::artifact_compression compression)
 {
   if (request.policy().output_layout() !=
-      pkgbuild::output_layout_kind::package_root_v1) {
+      pkgbuild::output_layout_kind::package_root) {
     throw error(error_code::invalid_session,
                 "unsupported build output layout");
   }
   if (compression != pkgbuild::artifact_compression::none) {
     throw error(error_code::invalid_session,
-                "libpkgbuild-exec 0.1 admits only uncompressed package_tar_v1");
+                "libpkgbuild-exec admits only uncompressed package_tar");
   }
 
   if (request.source().identity() != sources.source().identity()) {
     throw error(error_code::source_material_mismatch,
                 "source materialization does not belong to the build request");
   }
-  if (sources.objects().size() != request.sources().materials().size()) {
+  if (sources.objects().size() != request.source().recipe().sources().size()) {
     throw error(error_code::source_material_mismatch,
                 "source materialization cardinality differs from the build request");
   }
@@ -136,11 +136,11 @@ admitted_build_session admitted_build_session::admit(
     (void)normalize_absolute(object.object_path(), "verified source object");
   }
 
-  for (const auto& expected : request.sources().materials()) {
+  for (const auto& expected : request.source().recipe().sources()) {
     const auto first = std::find_if(
         sources.objects().begin(), sources.objects().end(),
         [&](const pkgfetch::verified_source_object& object) {
-          return object.declaration() == expected.declaration();
+          return object.declaration() == expected;
         });
     if (first == sources.objects().end()) {
       throw error(error_code::source_material_mismatch,
@@ -149,14 +149,14 @@ admitted_build_session admitted_build_session::admit(
     const auto duplicate = std::find_if(
         std::next(first), sources.objects().end(),
         [&](const pkgfetch::verified_source_object& object) {
-          return object.declaration() == expected.declaration();
+          return object.declaration() == expected;
         });
     if (duplicate != sources.objects().end()) {
       throw error(error_code::source_material_mismatch,
                   "a build-request source is materialized more than once");
     }
     if (first->observed_digest().hex() !=
-        expected.observed_content().hex()) {
+        expected.content_digest().hex()) {
       throw error(error_code::source_material_mismatch,
                   "materialized source digest differs from the build request");
     }
@@ -164,37 +164,36 @@ admitted_build_session admitted_build_session::admit(
 
   if (package_inputs.size() != request.inputs().inputs().size()) {
     throw error(error_code::package_input_mismatch,
-                "package-input tree cardinality differs from the build request");
+                "package-input resource cardinality differs from the build request");
   }
 
-  std::vector<package_input_tree> normalized_inputs;
+  std::vector<package_input_resource> normalized_inputs;
   normalized_inputs.reserve(request.inputs().inputs().size());
   std::vector<bool> consumed(package_inputs.size(), false);
   for (const auto& expected : request.inputs().inputs()) {
     std::optional<std::size_t> match;
     for (std::size_t index = 0; index < package_inputs.size(); ++index) {
       const auto& supplied = package_inputs[index];
-      if (supplied.input == expected.resolved().identity() &&
-          supplied.tree == expected.tree()) {
+      if (supplied.input == expected.identity()) {
         if (match) {
           throw error(error_code::package_input_mismatch,
-                      "a package-input subject is supplied more than once");
+                      "a package-input resource is supplied more than once");
         }
         match = index;
       }
     }
     if (!match) {
       throw error(error_code::package_input_mismatch,
-                  "a sealed package input lacks its concrete host tree");
+                  "a logical package input lacks its concrete host resource");
     }
     consumed[*match] = true;
     auto supplied = package_inputs[*match];
-    supplied.path = normalize_absolute(supplied.path, "package input tree");
+    supplied.path = normalize_absolute(supplied.path, "package input resource");
     normalized_inputs.push_back(std::move(supplied));
   }
   if (std::find(consumed.begin(), consumed.end(), false) != consumed.end()) {
     throw error(error_code::package_input_mismatch,
-                "an extra package-input tree is not present in the build request");
+                "an extra package-input resource is not present in the build request");
   }
 
   paths.root_view_path = normalize_absolute(paths.root_view_path, "root view");
@@ -216,16 +215,16 @@ admitted_build_session admitted_build_session::admit(
 
   for (std::size_t index = 0; index < normalized_inputs.size(); ++index) {
     const auto& path = normalized_inputs[index].path;
-    require_disjoint(path, "package input tree", paths.root_view_path,
+    require_disjoint(path, "package input resource", paths.root_view_path,
                      "root view");
-    require_disjoint(path, "package input tree", paths.session_root,
+    require_disjoint(path, "package input resource", paths.session_root,
                      "session root");
-    require_disjoint(path, "package input tree", paths.package_output_root,
+    require_disjoint(path, "package input resource", paths.package_output_root,
                      "package output root");
     for (std::size_t previous = 0; previous < index; ++previous) {
-      require_disjoint(path, "package input tree",
+      require_disjoint(path, "package input resource",
                        normalized_inputs[previous].path,
-                       "package input tree");
+                       "package input resource");
     }
   }
 
@@ -241,7 +240,7 @@ admitted_build_session admitted_build_session::admit(
   }
   for (const auto& input : normalized_inputs) {
     require_disjoint(paths.artifact_path, "artifact path", input.path,
-                     "package input tree");
+                     "package input resource");
   }
 
   for (const auto& object : sources.objects()) {
@@ -300,7 +299,7 @@ admitted_build_session::sources() const noexcept
   return sources_;
 }
 
-const std::vector<package_input_tree>&
+const std::vector<package_input_resource>&
 admitted_build_session::package_inputs() const noexcept
 {
   return package_inputs_;
@@ -327,10 +326,11 @@ build_execution_result::build_execution_result(
     pkgbuild::build_result build,
     std::optional<result_sealing_failure_kind> sealing_failure,
     std::string diagnostic,
-    std::optional<pkgimage::archive_inspection_receipt> artifact_inspection)
+    std::optional<pkgbuild::image_adapter::build_image_authority>
+        image_authority)
     : execution_(std::move(execution)), build_(std::move(build)),
       sealing_failure_(sealing_failure), diagnostic_(std::move(diagnostic)),
-      artifact_inspection_(std::move(artifact_inspection))
+      image_authority_(std::move(image_authority))
 {
 }
 
@@ -356,10 +356,10 @@ const std::string& build_execution_result::diagnostic() const noexcept
   return diagnostic_;
 }
 
-const std::optional<pkgimage::archive_inspection_receipt>&
-build_execution_result::artifact_inspection() const noexcept
+const std::optional<pkgbuild::image_adapter::build_image_authority>&
+build_execution_result::image_authority() const noexcept
 {
-  return artifact_inspection_;
+  return image_authority_;
 }
 
 } // namespace pkgbuild_exec
