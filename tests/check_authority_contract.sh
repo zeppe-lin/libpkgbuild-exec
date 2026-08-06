@@ -6,6 +6,7 @@ root=$1
 api=$root/include/libpkgbuild-exec/model.h
 executor=$root/src/executor.cpp
 meson=$root/meson.build
+design=$root/DESIGN.md
 
 # The adapter consumes sealed authorities and receives its backend.
 grep -q 'pkgbuild::build_request' "$api"
@@ -13,6 +14,12 @@ grep -q 'pkgfetch::source_materialization' "$api"
 grep -q 'pkgbuild::build_input_identity' "$api"
 grep -q 'pkgexec::resource_identity' "$api"
 ! grep -R -q 'input_tree_identity\|materialized_package_input' "$root/include" "$root/src"
+grep -F 'one explicit call-scoped resource identity and' "$design" >/dev/null
+grep -F 'does not issue or verify a content-addressed' "$design" >/dev/null
+if grep -E -n 'input-tree identity|Package-input tree identities|materialized tree identity' "$design" >/dev/null 2>&1; then
+  echo 'obsolete package-input tree authority remains in design documentation' >&2
+  exit 1
+fi
 grep -q 'pkgexec::execution_backend' \
   "$root/include/libpkgbuild-exec/executor.h"
 grep -q 'pkgbuild::image_adapter::build_image_authority' "$api"

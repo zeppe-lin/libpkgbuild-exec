@@ -29,8 +29,8 @@ libpkgbuild result
 Locators, cache paths, package-input host paths, session directories, and the
 artifact destination are effect coordinates. They do not enter native build
 identity. The caller supplies one exact root view, interpreter identity,
-numeric credential policy, concrete tree for every sealed package input, and
-explicit call-scoped paths.
+numeric credential policy, and one explicit call-scoped resource identity and
+host path for every logical package input retained by the sealed request.
 
 The adapter depends only on the backend-neutral `pkgexec::execution_backend`.
 Backend construction and `libpkgexec-linux` selection belong to orchestration.
@@ -41,15 +41,22 @@ A session is admitted only when:
 
 - the fetch materialization belongs to the request's exact source snapshot;
 - every sealed source occurs exactly once with the required SHA-256;
-- every sealed package input has exactly one matching input-tree identity;
+- every logical build or check input has exactly one matching
+  `package_input_resource` bound by its `pkgbuild::build_input_identity`;
+- no resource is duplicated, aliased to another logical input, or supplied for
+  an input absent from the request;
 - root, session, package-output, artifact, and package-input coordinates are
   absolute and do not overlap in ways that would mix authority with effects;
 - the output layout is `package_root`;
 - artifact compression is explicitly `none`.
 
-Package-input tree identities are upstream authority. This adapter binds their
-exact host coordinates and asks the execution backend to realize them
-read-only; it does not invent a second package-image or dependency verifier.
+A package-input resource deliberately keeps three facts separate: the logical
+input identity owned by `libpkgbuild`, the semantic resource identity consumed
+by `libpkgexec`, and the host path at which that resource is available for this
+call. The adapter matches those facts and asks the execution backend to expose
+the resource read-only. It does not issue or verify a content-addressed
+package-tree identity, inspect package provenance, or invent a second dependency
+validator.
 
 ## Source realization
 
@@ -65,7 +72,7 @@ archive extraction, decompression, patching, or any other transformation.
 
 ## Execution translation
 
-Version 0.1 translates the request's build program into a build-purpose
+The adapter translates the request's build program into a build-purpose
 execution request with:
 
 - a closed `C.UTF-8`, UTC environment;
@@ -98,7 +105,8 @@ representable precision before artifact encoding.
 
 ## Artifact publication and verification
 
-Version 0.1 writes only uncompressed `package_tar`. The archive is encoded
+The artifact contract writes only uncompressed `package_tar`. The archive is
+encoded
 in the destination directory under an unpublished temporary name, made
 read-only, synchronized, and hashed. Publication uses a same-filesystem hard
 link and fails if the final name already exists; existing artifact bytes are
@@ -123,7 +131,7 @@ The record embeds the canonical `libpkgexec 1.4` execution-result encoding and
 adds only adapter-owned fields.
 
 The record does not serialize a build request, execution request, backend
-profile, admitted session, source materialization, package-input tree, host
+profile, admitted session, source materialization, package-input resource, host
 path, credential policy, or execution resource. Decode requires the exact
 `pkgbuild::build_request`, `pkgexec::execution_request`, and
 `pkgexec::backend_capability_profile` bodies from their owning authorities.
