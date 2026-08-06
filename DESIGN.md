@@ -58,6 +58,20 @@ the resource read-only. It does not issue or verify a content-addressed
 package-tree identity, inspect package provenance, or invent a second dependency
 validator.
 
+## Pure execution-request projection
+
+`seal_execution_request()` derives the canonical `pkgexec::execution_request`
+from one admitted session without opening, creating, deleting, staging, chmodding,
+or otherwise touching host resources. The projection binds the same logical
+source, package-input, workspace, package-output, temporary, root-view,
+interpreter, environment, credential, limit, and cancellation authorities later
+used by execution.
+
+`prepare()` is the effect boundary. It realizes the staged source and writable
+directories, calls the pure projection, and admits host materializations for its
+exact resource slots. A restart path may therefore reproduce request authority
+without invoking destructive workspace preparation.
+
 ## Source realization
 
 A digest-shaped store path is not trusted by itself. Before execution, each

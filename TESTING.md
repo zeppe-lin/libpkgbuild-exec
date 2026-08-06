@@ -8,6 +8,8 @@ injected backend. It proves:
 - absence of inferred source extraction;
 - denied-network, closed-environment execution translation;
 - exact resource and package-input binding;
+- pure execution-request projection before any session/output path exists;
+- equality between the pure request and the request used by effectful preparation;
 - complete execution-evidence retention;
 - execution failure mapping into a failed build result;
 - descriptor-based package-root inspection;

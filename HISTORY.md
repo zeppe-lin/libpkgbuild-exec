@@ -1,3 +1,11 @@
+Version: 2.1.0
+Date: 2026-08-07
+
+- Add a pure canonical execution-request projection for admitted build sessions.
+- Keep source staging and host-resource realization in the existing prepare path.
+- Let restart composition reproduce request authority without touching workspaces.
+- Preserve the shared-library SONAME at 2; this is an additive API release.
+
 Version: 2.0.0
 Date: 2026-08-05
 

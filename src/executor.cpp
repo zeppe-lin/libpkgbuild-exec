@@ -1202,6 +1202,76 @@ public:
 
 } // namespace detail
 
+pkgexec::execution_request seal_execution_request(
+    const admitted_build_session& session)
+{
+  std::vector<pkgexec::resource_binding> bindings;
+
+  const auto source_slot = pkgexec::resource_slot::named(
+      pkgexec::resource_role::source_tree, "sources");
+  const auto source_identity = resource_identity(
+      "libpkgbuild-exec:source-tree:v1", session.sources().identity().hex());
+  bindings.emplace_back(source_slot, source_identity,
+                        pkgexec::resource_access::read_only,
+                        pkgexec::logical_path::parse("/build/source"));
+
+  for (const auto& expected : session.request().inputs().inputs()) {
+    const auto& supplied = supplied_resource(session, expected);
+    const auto role =
+        expected.scope() == pkgbuild::input_scope::build
+            ? pkgexec::resource_role::build_input_tree
+            : pkgexec::resource_role::check_input_tree;
+    const std::string name = package_input_name(expected);
+    const auto slot = pkgexec::resource_slot::named(role, name);
+    const std::string mount =
+        std::string("/build/inputs/") +
+        (role == pkgexec::resource_role::build_input_tree ? "build/" :
+                                                            "check/") +
+        name;
+    bindings.emplace_back(slot, supplied.resource,
+                          pkgexec::resource_access::read_only,
+                          pkgexec::logical_path::parse(mount));
+  }
+
+  const auto workspace_slot = pkgexec::resource_slot::singleton(
+      pkgexec::resource_role::build_workspace);
+  const auto workspace_identity = resource_identity(
+      "libpkgbuild-exec:workspace:v1", session.request().identity().hex());
+  bindings.emplace_back(workspace_slot, workspace_identity,
+                        pkgexec::resource_access::writable,
+                        pkgexec::logical_path::parse("/build/work"));
+
+  const auto output_slot = pkgexec::resource_slot::singleton(
+      pkgexec::resource_role::package_output_root);
+  const auto output_identity = resource_identity(
+      "libpkgbuild-exec:package-output-root:v1",
+      session.request().identity().hex());
+  bindings.emplace_back(output_slot, output_identity,
+                        pkgexec::resource_access::writable,
+                        pkgexec::logical_path::parse("/build/package"));
+
+  const auto temporary_slot = pkgexec::resource_slot::singleton(
+      pkgexec::resource_role::private_temporary_root);
+  const auto temporary_identity = resource_identity(
+      "libpkgbuild-exec:private-temporary-root:v1",
+      session.request().identity().hex());
+  bindings.emplace_back(temporary_slot, temporary_identity,
+                        pkgexec::resource_access::writable,
+                        pkgexec::logical_path::parse("/tmp"));
+
+  auto layout =
+      pkgexec::resource_layout::seal(std::move(bindings), workspace_slot);
+  return pkgexec::execution_request::seal(
+      session.request().build_program(), pkgexec::execution_purpose::build(),
+      session.identity().interpreter, session.paths().root_view,
+      std::move(layout), execution_environment(session.request()),
+      pkgexec::credential_policy::fixed(
+          session.identity().user_id, session.identity().group_id,
+          session.identity().supplementary_groups, true),
+      pkgexec::resource_limits::make(),
+      pkgexec::cancellation_policy::disabled());
+}
+
 prepared_execution prepare(const admitted_build_session& session)
 {
   const fs::path source_tree = session.paths().session_root / "source";
@@ -1239,78 +1309,35 @@ prepared_execution prepare(const admitted_build_session& session)
                 errno_message("seal staged source tree", errno));
   }
 
-  std::vector<pkgexec::resource_binding> bindings;
+  auto request = seal_execution_request(session);
   std::vector<pkgexec::resource_materialization> materializations;
 
   const auto source_slot = pkgexec::resource_slot::named(
       pkgexec::resource_role::source_tree, "sources");
-  const auto source_identity = resource_identity(
-      "libpkgbuild-exec:source-tree:v1", session.sources().identity().hex());
-  bindings.emplace_back(source_slot, source_identity,
-                        pkgexec::resource_access::read_only,
-                        pkgexec::logical_path::parse("/build/source"));
-  materializations.emplace_back(source_identity, source_tree);
+  materializations.emplace_back(
+      request.resources().binding(source_slot).resource(), source_tree);
 
   for (const auto& expected : session.request().inputs().inputs()) {
     const auto& supplied = supplied_resource(session, expected);
-    const auto role =
-        expected.scope() == pkgbuild::input_scope::build
-            ? pkgexec::resource_role::build_input_tree
-            : pkgexec::resource_role::check_input_tree;
-    const std::string name = package_input_name(expected);
-    const auto slot = pkgexec::resource_slot::named(role, name);
-    const auto& identity = supplied.resource;
-    const std::string mount =
-        std::string("/build/inputs/") +
-        (role == pkgexec::resource_role::build_input_tree ? "build/" :
-                                                            "check/") +
-        name;
-    bindings.emplace_back(slot, identity, pkgexec::resource_access::read_only,
-                          pkgexec::logical_path::parse(mount));
-    materializations.emplace_back(identity, supplied.path);
+    materializations.emplace_back(supplied.resource, supplied.path);
   }
 
   const auto workspace_slot = pkgexec::resource_slot::singleton(
       pkgexec::resource_role::build_workspace);
-  const auto workspace_identity = resource_identity(
-      "libpkgbuild-exec:workspace:v1", session.request().identity().hex());
-  bindings.emplace_back(workspace_slot, workspace_identity,
-                        pkgexec::resource_access::writable,
-                        pkgexec::logical_path::parse("/build/work"));
-  materializations.emplace_back(workspace_identity, workspace);
+  materializations.emplace_back(
+      request.resources().binding(workspace_slot).resource(), workspace);
 
   const auto output_slot = pkgexec::resource_slot::singleton(
       pkgexec::resource_role::package_output_root);
-  const auto output_identity = resource_identity(
-      "libpkgbuild-exec:package-output-root:v1",
-      session.request().identity().hex());
-  bindings.emplace_back(output_slot, output_identity,
-                        pkgexec::resource_access::writable,
-                        pkgexec::logical_path::parse("/build/package"));
-  materializations.emplace_back(output_identity,
-                                session.paths().package_output_root);
+  materializations.emplace_back(
+      request.resources().binding(output_slot).resource(),
+      session.paths().package_output_root);
 
   const auto temporary_slot = pkgexec::resource_slot::singleton(
       pkgexec::resource_role::private_temporary_root);
-  const auto temporary_identity = resource_identity(
-      "libpkgbuild-exec:private-temporary-root:v1",
-      session.request().identity().hex());
-  bindings.emplace_back(temporary_slot, temporary_identity,
-                        pkgexec::resource_access::writable,
-                        pkgexec::logical_path::parse("/tmp"));
-  materializations.emplace_back(temporary_identity, temporary);
+  materializations.emplace_back(
+      request.resources().binding(temporary_slot).resource(), temporary);
 
-  auto layout =
-      pkgexec::resource_layout::seal(std::move(bindings), workspace_slot);
-  auto request = pkgexec::execution_request::seal(
-      session.request().build_program(), pkgexec::execution_purpose::build(),
-      session.identity().interpreter, session.paths().root_view,
-      std::move(layout), execution_environment(session.request()),
-      pkgexec::credential_policy::fixed(
-          session.identity().user_id, session.identity().group_id,
-          session.identity().supplementary_groups, true),
-      pkgexec::resource_limits::make(),
-      pkgexec::cancellation_policy::disabled());
   auto resources = pkgexec::execution_resources::admit(
       request, session.paths().root_view, session.paths().root_view_path,
       std::move(materializations));

@@ -543,7 +543,14 @@ void test_prepare_contract()
 {
   fixture_owner owner("prepare");
   auto session = owner.get().session();
+  auto request = pkgbuild_exec::seal_execution_request(session);
+  require(!fs::exists(session.paths().session_root) &&
+              !fs::exists(session.paths().package_output_root) &&
+              !fs::exists(session.paths().artifact_path),
+          "pure request sealing touched build paths");
   auto prepared = pkgbuild_exec::prepare(session);
+  require(prepared.request == request,
+          "effectful preparation changed the canonical execution request");
   require(prepared.request.program() == owner.get().request.build_program(),
           "execution program differs from sealed build program");
   require(prepared.request.environment().network() ==

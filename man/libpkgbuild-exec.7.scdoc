@@ -11,6 +11,10 @@ libpkgbuild-exec - native sealed build-execution adapter
 inputs, and explicit execution coordinates. It translates that authority into
 a backend-neutral *libpkgexec* build request.
 
+*seal_execution_request()* reproduces that exact request without touching host
+resources. The effectful preparation path uses the same request, then stages
+source bytes and binds the call-scoped host materializations.
+
 Verified raw source objects are reopened, hashed again, staged under their
 exact declared local names, and exposed read-only. No archive extraction or
 source transformation is inferred.

@@ -4,6 +4,7 @@
 set -eu
 root=$1
 api=$root/include/libpkgbuild-exec/model.h
+executor_api=$root/include/libpkgbuild-exec/executor.h
 executor=$root/src/executor.cpp
 meson=$root/meson.build
 design=$root/DESIGN.md
@@ -20,8 +21,9 @@ if grep -E -n 'input-tree identity|Package-input tree identities|materialized tr
   echo 'obsolete package-input tree authority remains in design documentation' >&2
   exit 1
 fi
-grep -q 'pkgexec::execution_backend' \
-  "$root/include/libpkgbuild-exec/executor.h"
+grep -q 'pkgexec::execution_backend' "$executor_api"
+grep -q 'seal_execution_request' "$executor_api"
+grep -q 'without touching host resources' "$executor_api"
 grep -q 'pkgbuild::image_adapter::build_image_authority' "$api"
 ! grep -R -q 'libpkgexec-linux' "$root/include" "$root/src" "$meson"
 
@@ -38,6 +40,8 @@ grep -q 'resource_role::source_tree' "$executor"
 grep -q 'resource_role::build_input_tree' "$executor"
 grep -q 'resource_role::check_input_tree' "$executor"
 grep -q 'resource_role::package_output_root' "$executor"
+grep -q '^pkgexec::execution_request seal_execution_request(' "$executor"
+grep -q 'auto request = seal_execution_request(session);' "$executor"
 
 # Artifact production is non-replacing and independently inspected.
 grep -q 'archive_write_set_format_pax_restricted' "$executor"

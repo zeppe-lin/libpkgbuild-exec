@@ -10,7 +10,17 @@
 
 namespace pkgbuild_exec {
 
-/*! \brief Stage exact source bytes and seal the backend-neutral execution call. */
+/*! \brief Seal the backend-neutral request without touching host resources.
+ *
+ * This pure projection is the canonical way to reproduce the exact execution
+ * request retained by durable build evidence.  It validates the admitted
+ * logical/resource bindings but performs no directory creation, removal,
+ * staging, ownership change, or artifact mutation.
+ */
+[[nodiscard]] pkgexec::execution_request seal_execution_request(
+    const admitted_build_session& session);
+
+/*! \brief Stage exact source bytes and bind call-scoped host resources. */
 [[nodiscard]] prepared_execution prepare(
     const admitted_build_session& session);
 
