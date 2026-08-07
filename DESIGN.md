@@ -164,3 +164,8 @@ Diagnostic prose remains outside semantic build identity but is covered by the
 whole-record checksum. Every accepted record is re-encoded and must reproduce
 its original bytes. The codec performs no source staging, execution, payload
 inspection, artifact publication, archive reopening, cleanup, or mutation.
+
+The pure `project_prepared_paths()` projection owns the retained source-tree,
+build-workspace, and temporary coordinates beneath an admitted session root.
+Downstream composition must consume that projection rather than duplicate the
+adapter's path vocabulary.

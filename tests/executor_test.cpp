@@ -544,10 +544,15 @@ void test_prepare_contract()
   fixture_owner owner("prepare");
   auto session = owner.get().session();
   auto request = pkgbuild_exec::seal_execution_request(session);
+  auto paths = pkgbuild_exec::project_prepared_paths(session);
+  require(paths.source_tree == session.paths().session_root / "source" &&
+              paths.workspace == session.paths().session_root / "work" &&
+              paths.temporary_root == session.paths().session_root / "tmp",
+          "prepared path projection differs from adapter layout");
   require(!fs::exists(session.paths().session_root) &&
               !fs::exists(session.paths().package_output_root) &&
               !fs::exists(session.paths().artifact_path),
-          "pure request sealing touched build paths");
+          "pure request/path projection touched build paths");
   auto prepared = pkgbuild_exec::prepare(session);
   require(prepared.request == request,
           "effectful preparation changed the canonical execution request");

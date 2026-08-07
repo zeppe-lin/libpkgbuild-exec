@@ -1202,6 +1202,16 @@ public:
 
 } // namespace detail
 
+prepared_paths project_prepared_paths(
+    const admitted_build_session& session)
+{
+  return {
+      session.paths().session_root / "source",
+      session.paths().session_root / "work",
+      session.paths().session_root / "tmp",
+  };
+}
+
 pkgexec::execution_request seal_execution_request(
     const admitted_build_session& session)
 {
@@ -1274,26 +1284,24 @@ pkgexec::execution_request seal_execution_request(
 
 prepared_execution prepare(const admitted_build_session& session)
 {
-  const fs::path source_tree = session.paths().session_root / "source";
-  const fs::path workspace = session.paths().session_root / "work";
-  const fs::path temporary = session.paths().session_root / "tmp";
+  const auto paths = project_prepared_paths(session);
 
   reset_directory(session.paths().session_root, 0700);
-  reset_directory(source_tree, 0700);
+  reset_directory(paths.source_tree, 0700);
   prepare_writable_directory(
-      workspace, 0700, session.identity().user_id,
+      paths.workspace, 0700, session.identity().user_id,
       session.identity().group_id);
   prepare_writable_directory(
-      temporary, 0700, session.identity().user_id,
+      paths.temporary_root, 0700, session.identity().user_id,
       session.identity().group_id);
   prepare_writable_directory(
       session.paths().package_output_root, 0755,
       session.identity().user_id, session.identity().group_id);
   prepare_writable_child(
-      workspace / "home", 0700, session.identity().user_id,
+      paths.workspace / "home", 0700, session.identity().user_id,
       session.identity().group_id);
 
-  unique_fd source_directory(::open(source_tree.c_str(),
+  unique_fd source_directory(::open(paths.source_tree.c_str(),
                                      O_RDONLY | O_DIRECTORY | O_CLOEXEC |
                                          O_NOFOLLOW));
   if (!source_directory) {
@@ -1315,7 +1323,7 @@ prepared_execution prepare(const admitted_build_session& session)
   const auto source_slot = pkgexec::resource_slot::named(
       pkgexec::resource_role::source_tree, "sources");
   materializations.emplace_back(
-      request.resources().binding(source_slot).resource(), source_tree);
+      request.resources().binding(source_slot).resource(), paths.source_tree);
 
   for (const auto& expected : session.request().inputs().inputs()) {
     const auto& supplied = supplied_resource(session, expected);
@@ -1325,7 +1333,7 @@ prepared_execution prepare(const admitted_build_session& session)
   const auto workspace_slot = pkgexec::resource_slot::singleton(
       pkgexec::resource_role::build_workspace);
   materializations.emplace_back(
-      request.resources().binding(workspace_slot).resource(), workspace);
+      request.resources().binding(workspace_slot).resource(), paths.workspace);
 
   const auto output_slot = pkgexec::resource_slot::singleton(
       pkgexec::resource_role::package_output_root);
@@ -1336,13 +1344,14 @@ prepared_execution prepare(const admitted_build_session& session)
   const auto temporary_slot = pkgexec::resource_slot::singleton(
       pkgexec::resource_role::private_temporary_root);
   materializations.emplace_back(
-      request.resources().binding(temporary_slot).resource(), temporary);
+      request.resources().binding(temporary_slot).resource(),
+      paths.temporary_root);
 
   auto resources = pkgexec::execution_resources::admit(
       request, session.paths().root_view, session.paths().root_view_path,
       std::move(materializations));
-  return {std::move(request), std::move(resources), source_tree, workspace,
-          temporary};
+  return {std::move(request), std::move(resources), paths.source_tree,
+          paths.workspace, paths.temporary_root};
 }
 
 build_execution_result execute(const admitted_build_session& session,

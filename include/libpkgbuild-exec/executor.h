@@ -20,6 +20,10 @@ namespace pkgbuild_exec {
 [[nodiscard]] pkgexec::execution_request seal_execution_request(
     const admitted_build_session& session);
 
+/*! \brief Project adapter-owned prepared paths without host effects. */
+[[nodiscard]] prepared_paths project_prepared_paths(
+    const admitted_build_session& session);
+
 /*! \brief Stage exact source bytes and bind call-scoped host resources. */
 [[nodiscard]] prepared_execution prepare(
     const admitted_build_session& session);

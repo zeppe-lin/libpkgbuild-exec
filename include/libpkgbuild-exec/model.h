@@ -97,6 +97,13 @@ private:
   pkgbuild::artifact_compression compression_;
 };
 
+/*! \brief Adapter-owned host paths derived without touching the filesystem. */
+struct prepared_paths final {
+  std::filesystem::path source_tree;
+  std::filesystem::path workspace;
+  std::filesystem::path temporary_root;
+};
+
 /*! \brief Backend-neutral request and exact call-scoped resources. */
 struct prepared_execution final {
   pkgexec::execution_request request;

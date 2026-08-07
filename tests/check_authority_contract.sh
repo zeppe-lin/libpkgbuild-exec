@@ -23,6 +23,7 @@ if grep -E -n 'input-tree identity|Package-input tree identities|materialized tr
 fi
 grep -q 'pkgexec::execution_backend' "$executor_api"
 grep -q 'seal_execution_request' "$executor_api"
+grep -q 'project_prepared_paths' "$executor_api"
 grep -q 'without touching host resources' "$executor_api"
 grep -q 'pkgbuild::image_adapter::build_image_authority' "$api"
 ! grep -R -q 'libpkgexec-linux' "$root/include" "$root/src" "$meson"
@@ -40,7 +41,9 @@ grep -q 'resource_role::source_tree' "$executor"
 grep -q 'resource_role::build_input_tree' "$executor"
 grep -q 'resource_role::check_input_tree' "$executor"
 grep -q 'resource_role::package_output_root' "$executor"
+grep -q '^prepared_paths project_prepared_paths(' "$executor"
 grep -q '^pkgexec::execution_request seal_execution_request(' "$executor"
+grep -q 'const auto paths = project_prepared_paths(session);' "$executor"
 grep -q 'auto request = seal_execution_request(session);' "$executor"
 
 # Artifact production is non-replacing and independently inspected.
