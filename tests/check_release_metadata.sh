@@ -4,11 +4,11 @@
 set -eu
 root=$1
 
-grep -q "version: '2.1.0'" "$root/meson.build"
+grep -q "version: '2.2.0'" "$root/meson.build"
 grep -q "soversion: '2'" "$root/src/meson.build"
-grep -q '^Version: 2.1.0$' "$root/HISTORY.md"
+grep -q '^Version: 2.2.0$' "$root/HISTORY.md"
 grep -q '^Date: 2026-08-07$' "$root/HISTORY.md"
-grep -q '^# libpkgbuild-exec 2.1.0$' "$root/README.md"
+grep -q '^# libpkgbuild-exec 2.2.0$' "$root/README.md"
 grep -q "libpkgbuild >= 3.0.0" "$root/src/meson.build"
 grep -q "libpkgbuild < 4.0.0" "$root/src/meson.build"
 grep -q "libpkgbuild-image >= 1.0.0" "$root/src/meson.build"

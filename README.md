@@ -1,4 +1,4 @@
-# libpkgbuild-exec 2.1.0
+# libpkgbuild-exec 2.2.0
 
 `libpkgbuild-exec` is the native build-execution adapter for Zeppe-Lin.
 It realizes one sealed `libpkgbuild` request through a caller-supplied,
@@ -13,10 +13,12 @@ The adapter combines:
 - an injected `pkgexec::execution_backend`.
 
 Before any host effect, `seal_execution_request()` can reproduce the exact
-backend-neutral execution request from an admitted session. `prepare()` uses
-that same projection, then stages and binds host resources. This separation lets
-restart recovery validate durable execution evidence without deleting or
-recreating a workspace merely to recover request authority.
+backend-neutral execution request from an admitted session and
+`project_prepared_paths()` can reproduce the adapter-owned source, workspace,
+and temporary paths. `prepare()` uses those same projections, then stages and
+binds host resources. This separation lets restart recovery and downstream
+check composition recover exact request and resource coordinates without
+deleting or recreating a workspace.
 
 The effectful path stages each verified source again under its exact declared
 `local_name`, requests denied-network execution, retains the complete execution result,
