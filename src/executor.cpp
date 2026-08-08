@@ -1180,6 +1180,52 @@ const package_input_resource& supplied_resource(
   return *found;
 }
 
+void require_unique_execution_resource_identities(
+    const std::vector<pkgexec::resource_binding>& bindings)
+{
+  std::set<pkgexec::resource_identity> resources;
+  for (const auto& binding : bindings) {
+    if (!resources.insert(binding.resource()).second) {
+      throw error(
+          error_code::package_input_mismatch,
+          "a package-input resource aliases another execution resource");
+    }
+  }
+}
+
+pkgexec::backend_capability_profile backend_capabilities(
+    pkgexec::execution_backend& backend)
+{
+  try {
+    return backend.capabilities();
+  } catch (const std::exception& value) {
+    throw error(
+        error_code::backend_contract_violation,
+        std::string("execution backend could not report capabilities: ") +
+            value.what());
+  } catch (...) {
+    throw error(error_code::backend_contract_violation,
+                "execution backend threw non-standard capability evidence");
+  }
+}
+
+pkgexec::execution_result invoke_backend(
+    pkgexec::execution_backend& backend,
+    const prepared_execution& prepared)
+{
+  try {
+    return backend.execute(prepared.request, prepared.resources);
+  } catch (const std::exception& value) {
+    throw error(
+        error_code::backend_contract_violation,
+        std::string("execution backend threw instead of returning evidence: ") +
+            value.what());
+  } catch (...) {
+    throw error(error_code::backend_contract_violation,
+                "execution backend threw non-standard execution evidence");
+  }
+}
+
 } // namespace
 
 namespace detail {
@@ -1269,6 +1315,7 @@ pkgexec::execution_request seal_execution_request(
                         pkgexec::resource_access::writable,
                         pkgexec::logical_path::parse("/tmp"));
 
+  require_unique_execution_resource_identities(bindings);
   auto layout =
       pkgexec::resource_layout::seal(std::move(bindings), workspace_slot);
   return pkgexec::execution_request::seal(
@@ -1285,6 +1332,7 @@ pkgexec::execution_request seal_execution_request(
 prepared_execution prepare(const admitted_build_session& session)
 {
   const auto paths = project_prepared_paths(session);
+  auto request = seal_execution_request(session);
 
   reset_directory(session.paths().session_root, 0700);
   reset_directory(paths.source_tree, 0700);
@@ -1317,7 +1365,6 @@ prepared_execution prepare(const admitted_build_session& session)
                 errno_message("seal staged source tree", errno));
   }
 
-  auto request = seal_execution_request(session);
   std::vector<pkgexec::resource_materialization> materializations;
 
   const auto source_slot = pkgexec::resource_slot::named(
@@ -1357,19 +1404,17 @@ prepared_execution prepare(const admitted_build_session& session)
 build_execution_result execute(const admitted_build_session& session,
                                pkgexec::execution_backend& backend)
 {
+  const auto advertised_backend = backend_capabilities(backend);
   auto prepared = prepare(session);
-  pkgexec::execution_result execution = [&]() {
-    try {
-      return backend.execute(prepared.request, prepared.resources);
-    } catch (const std::exception& value) {
-      throw error(error_code::backend_contract_violation,
-                  std::string("execution backend threw instead of returning ") +
-                      "evidence: " + value.what());
-    }
-  }();
+  auto execution = invoke_backend(backend, prepared);
   if (execution.request() != prepared.request) {
     throw error(error_code::backend_contract_violation,
                 "execution backend returned evidence for another request");
+  }
+  if (execution.backend() != advertised_backend) {
+    throw error(
+        error_code::backend_contract_violation,
+        "execution backend returned evidence for another backend profile");
   }
 
   const auto evidence = detail::execution_evidence_identity(execution);

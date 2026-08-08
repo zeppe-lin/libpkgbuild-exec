@@ -196,6 +196,15 @@ admitted_build_session admitted_build_session::admit(
                 "an extra package-input resource is not present in the build request");
   }
 
+  std::set<pkgexec::resource_identity> input_resources;
+  for (const auto& input : normalized_inputs) {
+    if (!input_resources.insert(input.resource).second) {
+      throw error(
+          error_code::package_input_mismatch,
+          "distinct logical package inputs share one execution resource identity");
+    }
+  }
+
   paths.root_view_path = normalize_absolute(paths.root_view_path, "root view");
   paths.session_root = normalize_absolute(paths.session_root, "session root");
   paths.package_output_root =

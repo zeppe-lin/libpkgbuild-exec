@@ -54,9 +54,12 @@ A package-input resource deliberately keeps three facts separate: the logical
 input identity owned by `libpkgbuild`, the semantic resource identity consumed
 by `libpkgexec`, and the host path at which that resource is available for this
 call. The adapter matches those facts and asks the execution backend to expose
-the resource read-only. It does not issue or verify a content-addressed
-package-tree identity, inspect package provenance, or invent a second dependency
-validator.
+the resource read-only. Session admission rejects distinct logical inputs that
+share one semantic resource identity. Pure request projection additionally
+rejects a package-input resource that aliases an adapter-owned source, workspace,
+package-output, or temporary resource, before effectful preparation mutates any
+host path. The adapter does not issue or verify a content-addressed package-tree
+identity, inspect package provenance, or invent a second dependency validator.
 
 ## Pure execution-request projection
 
@@ -99,6 +102,12 @@ execution request with:
 
 The supplied root view must satisfy the selected backend's own root and mount
 point contract. This adapter does not mutate or manufacture that root view.
+
+Before effectful preparation, execution snapshots the backend capability profile.
+A backend exception is translated into `backend_contract_violation`, and returned
+execution evidence must name both the exact projected request and that advertised
+capability profile. Backend-owned evidence therefore cannot silently switch
+request or backend authority underneath one admitted build.
 
 ## Payload inspection
 

@@ -4,6 +4,9 @@ Date: 2026-08-07
 - Expose a pure projection of adapter-owned prepared source, workspace, and temporary paths.
 - Make effectful preparation consume the same path projection used by downstream composition.
 - Preserve the shared-library SONAME at 2; this is an additive API release.
+- Reject package-input resource aliasing before concrete execution admission.
+- Bind returned execution evidence to the backend capability profile advertised
+  for the call and translate backend exceptions into adapter-owned failure.
 
 Version: 2.1.0
 Date: 2026-08-07
