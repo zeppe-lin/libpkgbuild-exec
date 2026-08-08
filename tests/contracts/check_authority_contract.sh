@@ -23,6 +23,11 @@ if grep -E -n 'input-tree identity|Package-input tree identities|materialized tr
 fi
 grep -q 'pkgexec::execution_backend' "$executor_api"
 grep -q 'seal_execution_request' "$executor_api"
+grep -q 'distinct logical package inputs share one execution resource identity' "$root/src/model.cpp"
+grep -q 'require_unique_execution_resource_identities' "$executor"
+grep -q 'const auto advertised_backend = backend_capabilities(backend);' "$executor"
+grep -q 'execution.backend() != advertised_backend' "$executor"
+grep -q 'execution backend threw non-standard execution evidence' "$executor"
 grep -q 'project_prepared_paths' "$executor_api"
 grep -q 'without touching host resources' "$executor_api"
 grep -q 'pkgbuild::image_adapter::build_image_authority' "$api"
@@ -45,6 +50,12 @@ grep -q '^prepared_paths project_prepared_paths(' "$executor"
 grep -q '^pkgexec::execution_request seal_execution_request(' "$executor"
 grep -q 'const auto paths = project_prepared_paths(session);' "$executor"
 grep -q 'auto request = seal_execution_request(session);' "$executor"
+request_line=$(grep -n 'auto request = seal_execution_request(session);' "$executor" | tail -n 1 | cut -d: -f1)
+reset_line=$(grep -n 'reset_directory(session.paths().session_root' "$executor" | cut -d: -f1)
+test "$request_line" -lt "$reset_line" || {
+  echo 'execution request is sealed only after effectful preparation begins' >&2
+  exit 1
+}
 
 # Artifact production is non-replacing and independently inspected.
 grep -q 'archive_write_set_format_pax_restricted' "$executor"

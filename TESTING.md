@@ -1,30 +1,31 @@
 # Testing
 
-The executable contract test uses real `libpkgfetch` materialization and an
-injected backend. It proves:
+The suite is separated by evidence role. A failure should identify whether the
+problem belongs to adapter value semantics, caller/callee composition, durable
+wire evidence, public-header closure, or a static authority/release contract.
 
-- exact source and package-input admission;
-- source-object reopening, byte revalidation, and read-only staging;
-- absence of inferred source extraction;
-- denied-network, closed-environment execution translation;
-- exact resource and package-input binding;
-- pure execution-request projection before any session/output path exists;
-- equality between the pure request and the request used by effectful preparation;
-- complete execution-evidence retention;
-- execution failure mapping into a failed build result;
-- descriptor-based package-root inspection;
-- regular, directory, symbolic-link, hard-link, and FIFO encoding;
-- rejection of unsupported output objects;
-- non-replacing artifact publication;
-- cleanup after failed result sealing;
-- independent inspection of the published bytes through `libpkgimage`;
-- deterministic bytes and build identity across different effect paths;
-- rejection of backend evidence for a different execution request.
+Meson suites:
 
-Run the normal suite:
+- `unit`
+- `integration`
+- `protocol`
+- `header`
+- `contract`
+
+Run the complete native suite:
 
 ```sh
 meson test -C build --print-errorlogs
+```
+
+Run one evidence role independently:
+
+```sh
+meson test -C build --suite unit --print-errorlogs
+meson test -C build --suite integration --print-errorlogs
+meson test -C build --suite protocol --print-errorlogs
+meson test -C build --suite header --print-errorlogs
+meson test -C build --suite contract --print-errorlogs
 ```
 
 Qualify each dependency closure independently:
@@ -34,14 +35,91 @@ Qualify each dependency closure independently:
 ./ci/qualify.sh static
 ```
 
-## Durable evidence codec
+## Unit qualification
 
-The executor fixture is also run in codec-only mode. It produces real adapter
-results for successful artifact sealing, execution failure, and
-post-execution sealing failure, then proves exact canonical round trips.
-Negative cases cover record corruption, truncation, and substitution of the
-build request, execution request, or backend profile.
+`error-value` pins the stable adapter error and result-sealing vocabulary without
+constructing filesystem or execution authority.
 
-The codec contract test additionally proves that decoding has no admitted
-session, filesystem path, backend invocation, preparation, or execution
-surface, and that installation metadata requires `libpkgexec >= 1.4.0`.
+## Integration qualification
+
+Integration fixtures build genuine authorities through `libpkgsource`,
+`libpkgcatalog`, `libpkgstate`, `libpkgresolve`, `libpkgbuild`, `libpkgfetch`,
+and `libpkgexec`. The execution backend is injected because concrete backend
+selection belongs to orchestration; the fixture backend returns real sealed
+`libpkgexec::execution_result` values and otherwise owns no build policy.
+
+`session-admission` proves:
+
+- source materialization belongs to the exact sealed build source;
+- unordered concrete package inputs canonicalize to build-request order;
+- missing, duplicate, and aliased logical package-input resources are refused;
+- relative, root, overlapping, and artifact-overlap effect coordinates are
+  refused before mutation;
+- supplementary groups are canonicalized and duplicate/primary aliases are
+  refused;
+- native credential bounds are enforced; and
+- only uncompressed `package_tar` realization is admitted.
+
+`request-projection` proves:
+
+- pure build-purpose request sealing performs no host mutation;
+- exact program, interpreter, root, credentials, environment, input lists,
+  mount points, access modes, and working directory are retained;
+- the required guarantee set is exactly the policy derived from the sealed
+  request;
+- no limits or cancellation policy are invented;
+- session, artifact, and package-input host paths do not enter semantic request
+  identity;
+- package-input semantic resource identities do enter request identity; and
+- a caller-supplied package-input resource cannot alias an adapter-owned source,
+  workspace, package-output, or temporary resource. That refusal occurs before
+  effectful preparation begins.
+
+`preparation` proves exact verified source bytes are reopened, rehashed, staged
+under their declared local names, sealed read-only, and bound together with the
+exact writable workspace/output/temporary resources. Changed bytes and a final
+source-object symlink are refused.
+
+`backend-contract` proves capability observation and execution are both
+exception-contained. Returned execution evidence must name the exact projected
+request and the exact capability profile advertised before preparation. Both
+standard and non-standard backend throws are translated into
+`backend_contract_violation`; capability failure occurs before build paths are
+mutated.
+
+`execution-failure` independently qualifies not-started backend refusal and a
+started nonzero program failure. Both retain exact `libpkgexec` evidence and
+become failed `libpkgbuild` results without inventing post-execution sealing or
+artifact evidence.
+
+`execution-success` proves complete process evidence, payload inspection,
+hard-link and symlink topology, FIFO retention, deterministic uncompressed
+package-tar bytes, read-only non-replacing publication, independent
+`libpkgimage` inspection, and effect-coordinate independence of final build
+identity.
+
+`result-sealing` keeps successful process execution distinct from a successful
+build. It proves refusal of unsupported package-output objects, empty output,
+and an already-existing artifact destination, including non-replacement of the
+existing bytes.
+
+## Durable evidence protocol
+
+`result-codec-roundtrip` produces real adapter results for successful artifact
+sealing, pre-start execution failure, started program failure, and
+post-execution payload-sealing failure. Every shape must round-trip exactly and
+re-encode byte-for-byte canonically.
+
+`result-codec-refusal` covers checksum corruption, truncation, trailing bytes,
+and substitution of the build request, execution request, or backend profile.
+Decode remains evidence-only: it does not admit a session, stage sources,
+execute a backend, inspect package output, publish an artifact, or clean up
+filesystem state.
+
+## Public headers and contracts
+
+Every installed public header is compiled as a standalone translation unit.
+Static contracts pin the build/execution authority boundary, durable codec
+shape, release metadata, test-role layout, absence of `libpkgexec-linux` from
+this backend-neutral adapter, source-byte revalidation, non-replacing artifact
+publication, and request-sealing-before-effects ordering.

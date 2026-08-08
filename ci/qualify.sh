@@ -12,9 +12,10 @@ case $mode in
 esac
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-"$root/tests/check_authority_contract.sh" "$root"
-"$root/tests/check_codec_contract.sh" "$root"
-"$root/tests/check_release_metadata.sh" "$root"
+"$root/tests/contracts/check_authority_contract.sh" "$root"
+"$root/tests/contracts/check_codec_contract.sh" "$root"
+"$root/tests/contracts/check_release_metadata.sh" "$root"
+"$root/tests/contracts/check_test_layout.sh" "$root"
 
 meson setup "$build" --wipe \
   -Ddefault_library="$mode" \
