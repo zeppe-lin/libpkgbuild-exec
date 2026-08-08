@@ -12,6 +12,12 @@ for directory in contracts fixtures header integration protocol support unit; do
   }
 done
 
+grep -F "test('header-' + header.underscorify(), header_test, suite: 'header')" "$meson" >/dev/null
+if grep -F "test('header:'" "$meson" >/dev/null; then
+  echo 'deprecated colon remains in generated header test name' >&2
+  exit 1
+fi
+
 for suite in unit integration protocol header contract; do
   grep -F "suite: '$suite'" "$meson" >/dev/null || {
     echo "missing Meson test suite: $suite" >&2

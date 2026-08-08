@@ -63,7 +63,7 @@ foreach header : public_headers
     ],
     dependencies: libpkgbuild_exec_dep,
   )
-  test('header:' + header, header_test, suite: 'header')
+  test('header-' + header.underscorify(), header_test, suite: 'header')
 endforeach
 
 contract_tests = {
