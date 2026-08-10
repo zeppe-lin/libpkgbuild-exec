@@ -92,4 +92,12 @@ if library_kind == 'shared'
     args: [libpkgbuild_exec, meson.project_source_root() / 'abi/libpkgbuild-exec.exports'],
     suite: 'contract',
   )
+
+  fetch_abi_generation = find_program('contracts/check_fetch_abi_generation.sh')
+  test(
+    'fetch-abi-generation',
+    fetch_abi_generation,
+    args: [libpkgbuild_exec],
+    suite: 'contract',
+  )
 endif

@@ -33,6 +33,14 @@ A dependency SONAME change is not by itself a reason to advance this library's
 SONAME. Advance the provider ABI only when a public `libpkgbuild-exec` signature,
 layout, virtual protocol, or other binary contract changes.
 
+`admitted_build_session` retains `pkgfetch::source_materialization` by value. A
+future `libpkgfetch` ABI generation therefore requires an explicit layout and
+public-ABI review before widening the accepted dependency range. The 1.x to 2.x
+fetch correction does not advance `libpkgbuild-exec` ABI generation: the r57
+2.2.0 ABI was already compiled against the source-3-shaped fetch headers, and
+`libpkgfetch 2.0.0` changes their SONAME/owner metadata without changing those
+public headers. Shared qualification must prove a `libpkgfetch.so.2` NEEDED edge.
+
 Installed qualification must compile and run `tests/installed/consumer.cpp`
 through the installed `libpkgbuild-exec.pc`. Static qualification uses
 `pkg-config --static` so private libarchive/libcrypto/libpkgimage closure is

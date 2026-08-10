@@ -39,6 +39,11 @@ grep -F "'integration/execution_success_test.cpp'" "$meson" >/dev/null
 grep -F "'integration/result_sealing_test.cpp'" "$meson" >/dev/null
 grep -F "'protocol/result_codec_roundtrip_test.cpp'" "$meson" >/dev/null
 grep -F "'protocol/result_codec_refusal_test.cpp'" "$meson" >/dev/null
+grep -F "'fetch-abi-generation'" "$meson" >/dev/null
+[ -x "$root/tests/contracts/check_fetch_abi_generation.sh" ] || {
+  echo 'missing executable fetch ABI generation contract' >&2
+  exit 1
+}
 [ -f "$root/tests/installed/consumer.cpp" ] || {
   echo 'missing installed consumer' >&2
   exit 1

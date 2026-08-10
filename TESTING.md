@@ -13,6 +13,9 @@ Meson suites:
 - `contract`
 
 The shared build also runs an exact ELF ABI-surface contract.
+It also verifies that the built DSO names `libpkgfetch.so.2` directly, so release
+metadata cannot claim generation 2 while the binary still closes over an obsolete
+fetch SONAME.
 
 Run the complete native suite:
 
