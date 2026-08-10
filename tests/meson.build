@@ -71,6 +71,8 @@ contract_tests = {
   'codec-contract': 'contracts/check_codec_contract.sh',
   'release-metadata': 'contracts/check_release_metadata.sh',
   'test-layout': 'contracts/check_test_layout.sh',
+  'abi-contract': 'contracts/check_abi_contract.sh',
+  'ci-contract': 'contracts/check_ci_contract.sh',
 }
 foreach name, program : contract_tests
   test(
@@ -80,3 +82,14 @@ foreach name, program : contract_tests
     suite: 'contract',
   )
 endforeach
+
+
+if library_kind == 'shared'
+  abi_surface = find_program('contracts/check_abi_surface.sh')
+  test(
+    'abi-surface',
+    abi_surface,
+    args: [libpkgbuild_exec, meson.project_source_root() / 'abi/libpkgbuild-exec.exports'],
+    suite: 'contract',
+  )
+endif

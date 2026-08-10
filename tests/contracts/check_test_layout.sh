@@ -5,7 +5,7 @@ set -eu
 root=$1
 meson=$root/tests/meson.build
 
-for directory in contracts fixtures header integration protocol support unit; do
+for directory in contracts fixtures header installed integration protocol support unit; do
   test -d "$root/tests/$directory" || {
     echo "missing test role directory: $directory" >&2
     exit 1
@@ -39,3 +39,7 @@ grep -F "'integration/execution_success_test.cpp'" "$meson" >/dev/null
 grep -F "'integration/result_sealing_test.cpp'" "$meson" >/dev/null
 grep -F "'protocol/result_codec_roundtrip_test.cpp'" "$meson" >/dev/null
 grep -F "'protocol/result_codec_refusal_test.cpp'" "$meson" >/dev/null
+[ -f "$root/tests/installed/consumer.cpp" ] || {
+  echo 'missing installed consumer' >&2
+  exit 1
+}

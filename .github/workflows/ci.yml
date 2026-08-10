@@ -1,68 +1,110 @@
 # SPDX-FileCopyrightText: 2026 Alexandr Savca
 # SPDX-License-Identifier: GPL-3.0-or-later
 name: ci
-on:
-  push:
-  pull_request:
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        mode: [shared, static]
+        include:
+          - {name: GCC shared, cc: gcc, cxx: g++, mode: shared, buildtype: debug}
+          - {name: GCC static, cc: gcc, cxx: g++, mode: static, buildtype: debug}
+          - {name: Clang shared, cc: clang, cxx: clang++, mode: shared, buildtype: debug}
+          - {name: Clang static, cc: clang, cxx: clang++, mode: static, buildtype: debug}
+          - {name: GCC release, cc: gcc, cxx: g++, mode: shared, buildtype: release}
+    name: ${{ matrix.name }}
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies
-        run: >-
-          sudo apt-get update && sudo apt-get install -y
-          g++ meson ninja-build pkg-config libssl-dev
-          libarchive-dev libcurl4-openssl-dev scdoc
-      - name: Checkout exact native authorities
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgsource, ref: 9a2a85c85c20bbfa77306f3eb14ccc67ac1e800c, path: dependencies/libpkgsource}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgstate, ref: f74df278b47b48e798c3de01c922c59b58319d13, path: dependencies/libpkgstate}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgimage, ref: 284324996dce673e1a96d73f8adb90b29dbb79f5, path: dependencies/libpkgimage}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgcatalog, ref: 16976cac176f576871e327d5d2f6fe9d9dfa0666, path: dependencies/libpkgcatalog}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgresolve, ref: 4272e066d35a4ea7a13d7e7dc8c6d536a5490785, path: dependencies/libpkgresolve}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgbuild, ref: c6dc011eb8a28009e67503a5e7a35c150e966382, path: dependencies/libpkgbuild}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgfetch, ref: 18501adc5df0e308ab35ce57f009158185fdb3b3, path: dependencies/libpkgfetch}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgexec, ref: 08814baf2dbc037a037f29dd7de218e5a19c7e77, path: dependencies/libpkgexec}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgbuild-image, ref: a8077e6d6a5143a5a7c6537d001703615562f4e7, path: dependencies/libpkgbuild-image}}
+      - name: Install tools
         run: |
-          git clone https://github.com/zeppe-lin/libpkgsource.git ../libpkgsource
-          git -C ../libpkgsource checkout fb48d79d1814959fbda0ac6740b26a76f50c1222
-          git clone https://github.com/zeppe-lin/libpkgbuild.git ../libpkgbuild
-          git -C ../libpkgbuild checkout fda7ccc10a9955eb7cdaf00c2a00104590fdd3d5
-          git clone https://github.com/zeppe-lin/libpkgfetch.git ../libpkgfetch
-          git -C ../libpkgfetch checkout aee518a32a373c84f0270c05aed024fcbef8ac5e
-          git clone https://github.com/zeppe-lin/libpkgexec.git ../libpkgexec
-          git -C ../libpkgexec checkout 16000a60ea18774d82008c2d67bbd06050a79978
-          git clone https://github.com/zeppe-lin/libpkgimage.git ../libpkgimage
-          git -C ../libpkgimage checkout e1f6dfd8cc4bfeb2f8da44345d8ec6368281c6e0
-      - name: Build exact native authorities
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            clang libarchive-dev libbz2-dev libcurl4-openssl-dev liblz4-dev \
+            liblzma-dev libssl-dev libxml2-dev libzstd-dev ninja-build \
+            pkg-config python3-venv scdoc zlib1g-dev
+          python3 -m venv "$RUNNER_TEMP/meson"
+          "$RUNNER_TEMP/meson/bin/pip" install 'meson==1.10.2'
+          echo "$RUNNER_TEMP/meson/bin" >> "$GITHUB_PATH"
+      - name: Configure, build, and test
+        env: &sources
+          LIBPKGSOURCE_SOURCE: dependencies/libpkgsource
+          LIBPKGSTATE_SOURCE: dependencies/libpkgstate
+          LIBPKGIMAGE_SOURCE: dependencies/libpkgimage
+          LIBPKGCATALOG_SOURCE: dependencies/libpkgcatalog
+          LIBPKGRESOLVE_SOURCE: dependencies/libpkgresolve
+          LIBPKGBUILD_SOURCE: dependencies/libpkgbuild
+          LIBPKGFETCH_SOURCE: dependencies/libpkgfetch
+          LIBPKGEXEC_SOURCE: dependencies/libpkgexec
+          LIBPKGBUILD_IMAGE_SOURCE: dependencies/libpkgbuild-image
+          MESON_BUILDTYPE: ${{ matrix.buildtype }}
+        run: ./ci/configure-and-test.sh build ${{ matrix.mode }}
+
+  sanitizers:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: GCC, cc: gcc, cxx: g++}
+          - {name: Clang, cc: clang, cxx: clang++}
+    name: ${{ matrix.name }} address,undefined
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+      ASAN_OPTIONS: halt_on_error=1:abort_on_error=1:detect_leaks=1
+      UBSAN_OPTIONS: halt_on_error=1:abort_on_error=1:print_stacktrace=1
+    steps:
+      - uses: actions/checkout@v4
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgsource, ref: 9a2a85c85c20bbfa77306f3eb14ccc67ac1e800c, path: dependencies/libpkgsource}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgstate, ref: f74df278b47b48e798c3de01c922c59b58319d13, path: dependencies/libpkgstate}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgimage, ref: 284324996dce673e1a96d73f8adb90b29dbb79f5, path: dependencies/libpkgimage}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgcatalog, ref: 16976cac176f576871e327d5d2f6fe9d9dfa0666, path: dependencies/libpkgcatalog}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgresolve, ref: 4272e066d35a4ea7a13d7e7dc8c6d536a5490785, path: dependencies/libpkgresolve}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgbuild, ref: c6dc011eb8a28009e67503a5e7a35c150e966382, path: dependencies/libpkgbuild}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgfetch, ref: 18501adc5df0e308ab35ce57f009158185fdb3b3, path: dependencies/libpkgfetch}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgexec, ref: 08814baf2dbc037a037f29dd7de218e5a19c7e77, path: dependencies/libpkgexec}}
+      - {uses: actions/checkout@v4, with: {repository: zeppe-lin/libpkgbuild-image, ref: a8077e6d6a5143a5a7c6537d001703615562f4e7, path: dependencies/libpkgbuild-image}}
+      - name: Install tools
         run: |
-          prefix="$GITHUB_WORKSPACE/dependencies-${{ matrix.mode }}"
-          export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
-          for project in libpkgsource libpkgbuild libpkgfetch libpkgexec libpkgimage; do
-            extra=
-            case $project in
-              libpkgsource) extra='-Dyaml_adapter=disabled -Dplanner_adapter=disabled' ;;
-              libpkgbuild) extra='-Dplanner_adapter=disabled' ;;
-            esac
-            meson setup "../$project/build-${{ matrix.mode }}" "../$project" \
-              --prefix="$prefix" \
-              --libdir=lib \
-              -Ddefault_library=${{ matrix.mode }} \
-              -Dlink_mode=${{ matrix.mode }} \
-              -Dtests=disabled \
-              -Dman_pages=disabled \
-              $extra
-            meson compile -C "../$project/build-${{ matrix.mode }}"
-            meson install -C "../$project/build-${{ matrix.mode }}"
-          done
-      - name: Configure
-        run: |
-          prefix="$GITHUB_WORKSPACE/dependencies-${{ matrix.mode }}"
-          PKG_CONFIG_PATH="$prefix/lib/pkgconfig" meson setup build \
-            -Ddefault_library=${{ matrix.mode }} \
-            -Dlink_mode=${{ matrix.mode }} \
-            -Dman_pages=enabled \
-            -Dtests=enabled
-      - name: Compile
-        run: meson compile -C build
-      - name: Test
-        run: |
-          prefix="$GITHUB_WORKSPACE/dependencies-${{ matrix.mode }}"
-          LD_LIBRARY_PATH="$prefix/lib" meson test -C build --print-errorlogs
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            clang libarchive-dev libbz2-dev libcurl4-openssl-dev liblz4-dev \
+            liblzma-dev libssl-dev libxml2-dev libzstd-dev ninja-build \
+            pkg-config python3-venv scdoc zlib1g-dev
+          python3 -m venv "$RUNNER_TEMP/meson"
+          "$RUNNER_TEMP/meson/bin/pip" install 'meson==1.10.2'
+          echo "$RUNNER_TEMP/meson/bin" >> "$GITHUB_PATH"
+      - name: Configure, build, and test
+        env:
+          LIBPKGSOURCE_SOURCE: dependencies/libpkgsource
+          LIBPKGSTATE_SOURCE: dependencies/libpkgstate
+          LIBPKGIMAGE_SOURCE: dependencies/libpkgimage
+          LIBPKGCATALOG_SOURCE: dependencies/libpkgcatalog
+          LIBPKGRESOLVE_SOURCE: dependencies/libpkgresolve
+          LIBPKGBUILD_SOURCE: dependencies/libpkgbuild
+          LIBPKGFETCH_SOURCE: dependencies/libpkgfetch
+          LIBPKGEXEC_SOURCE: dependencies/libpkgexec
+          LIBPKGBUILD_IMAGE_SOURCE: dependencies/libpkgbuild-image
+          MESON_BUILDTYPE: debug
+          MESON_SANITIZE: address,undefined
+        run: ./ci/configure-and-test.sh build-sanitize shared

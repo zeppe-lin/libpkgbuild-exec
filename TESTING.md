@@ -12,6 +12,8 @@ Meson suites:
 - `header`
 - `contract`
 
+The shared build also runs an exact ELF ABI-surface contract.
+
 Run the complete native suite:
 
 ```sh
@@ -123,3 +125,24 @@ Static contracts pin the build/execution authority boundary, durable codec
 shape, release metadata, test-role layout, absence of `libpkgexec-linux` from
 this backend-neutral adapter, source-byte revalidation, non-replacing artifact
 publication, and request-sealing-before-effects ordering.
+
+
+## Installed and ABI qualification
+
+`ci/qualify.sh` installs the selected shared or static product into an isolated
+prefix and then compiles `tests/installed/consumer.cpp` exclusively through the
+installed pkg-config metadata. The consumer constructs genuine source/catalog/
+state/resolve/build/fetch authorities, admits a build session, projects its
+execution request and prepared paths, executes a refusing backend, and
+round-trips the resulting durable evidence. It is deliberately not a function-
+address linker probe.
+
+For static builds the consumer uses `pkg-config --static --libs
+libpkgbuild-exec`, forcing the private image/archive/crypto closure. For shared
+builds the runtime uses only the installed product and qualified dependency
+prefixes.
+
+The generation-2 ELF ABI is the exact 28-symbol manifest in
+`abi/libpkgbuild-exec.exports`. `abi-surface` compares the built shared object to
+that manifest; compiler-specific template/STL debris and private implementation
+symbols are release failures.

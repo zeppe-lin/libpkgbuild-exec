@@ -1,6 +1,9 @@
 Version: 2.2.0
 Date: 2026-08-07
 
+- Freeze the generation-2 ELF ABI to an exact 28-symbol compiler-independent manifest.
+- Qualify the current split source/state/catalog/resolve/build/fetch/exec/image closure.
+- Add a staged installed consumer that executes session admission, build realization, and durable evidence round-trip.
 - Expose a pure projection of adapter-owned prepared source, workspace, and temporary paths.
 - Make effectful preparation consume the same path projection used by downstream composition.
 - Preserve the shared-library SONAME at 2; this is an additive API release.

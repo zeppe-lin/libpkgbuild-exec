@@ -2,6 +2,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 public_inc = include_directories('../include')
+
+elf_export_generator = find_program(
+  meson.project_source_root() / 'tools/generate-elf-export-script.sh',
+)
+elf_export_script_name = 'libpkgbuild-exec.exports.map'
+elf_export_script_path = meson.current_build_dir() / elf_export_script_name
+elf_export_script = configure_file(
+  input: '../abi/libpkgbuild-exec.exports',
+  output: elf_export_script_name,
+  command: [elf_export_generator, '@INPUT@'],
+  capture: true,
+)
+
+library_link_args = ['-Wl,--version-script=' + elf_export_script_path]
+library_link_depends = [elf_export_script]
 public_headers = files(
   '../include/libpkgbuild-exec/error.h',
   '../include/libpkgbuild-exec/model.h',
@@ -23,6 +38,8 @@ libpkgbuild_exec = library(
   cpp_args: ['-D_FILE_OFFSET_BITS=64'],
   include_directories: public_inc,
   dependencies: public_deps + private_deps,
+  link_args: library_link_args,
+  link_depends: library_link_depends,
   install: true,
   version: meson.project_version(),
   soversion: '2',
