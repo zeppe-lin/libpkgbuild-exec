@@ -68,8 +68,8 @@ pkgconf.generate(
     'libpkgbuild-image < 2.0.0',
     'libpkgfetch >= 2.0.0',
     'libpkgfetch < 3.0.0',
-    'libpkgexec >= 1.4.0',
-    'libpkgexec < 2.0.0',
+    'libpkgexec >= 2.0.0',
+    'libpkgexec < 3.0.0',
   ],
   requires_private: [
     'libpkgimage >= 0.4.0',

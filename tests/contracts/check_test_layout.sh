@@ -48,3 +48,28 @@ grep -F "'fetch-abi-generation'" "$meson" >/dev/null
   echo 'missing installed consumer' >&2
   exit 1
 }
+
+grep -F "'pkgconfig-metadata'" "$meson" >/dev/null || {
+  echo 'missing generated pkg-config metadata contract registration' >&2
+  exit 1
+}
+grep -F "'abi-layout-test'" "$meson" >/dev/null || {
+  echo 'missing ABI layout contract registration' >&2
+  exit 1
+}
+grep -F "'exec-abi-generation'" "$meson" >/dev/null || {
+  echo 'missing exec ABI generation contract registration' >&2
+  exit 1
+}
+[ -f "$root/tests/contracts/abi_layout_test.cpp" ] || {
+  echo 'missing ABI layout contract source' >&2
+  exit 1
+}
+[ -x "$root/tests/contracts/check_pkgconfig_metadata.sh" ] || {
+  echo 'missing executable pkg-config metadata contract' >&2
+  exit 1
+}
+[ -x "$root/tests/contracts/check_exec_abi_generation.sh" ] || {
+  echo 'missing executable exec ABI generation contract' >&2
+  exit 1
+}

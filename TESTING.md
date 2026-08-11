@@ -16,6 +16,10 @@ The shared build also runs an exact ELF ABI-surface contract.
 It also verifies that the built DSO names `libpkgfetch.so.2` directly, so release
 metadata cannot claim generation 2 while the binary still closes over an obsolete
 fetch SONAME.
+The same shared-product gate requires `libpkgexec.so.2` and refuses exec 0/1.
+An x86-64 ABI-layout contract freezes every retained execution carrier plus the
+public `libpkgbuild-exec` values that contain them. Generated pkg-config metadata
+is checked as an exact, duplicate-free dependency set.
 
 Run the complete native suite:
 

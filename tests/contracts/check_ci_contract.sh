@@ -13,10 +13,10 @@ for expected in \
   'zeppe-lin/libpkgstate, ref: f74df278b47b48e798c3de01c922c59b58319d13' \
   'zeppe-lin/libpkgimage, ref: 284324996dce673e1a96d73f8adb90b29dbb79f5' \
   'zeppe-lin/libpkgcatalog, ref: 16976cac176f576871e327d5d2f6fe9d9dfa0666' \
-  'zeppe-lin/libpkgresolve, ref: 4272e066d35a4ea7a13d7e7dc8c6d536a5490785' \
-  'zeppe-lin/libpkgbuild, ref: c6dc011eb8a28009e67503a5e7a35c150e966382' \
+  'zeppe-lin/libpkgresolve, ref: f8786884cde0d2692119a79ac98582fade20fe97' \
+  'zeppe-lin/libpkgbuild, ref: dadabeccf0118f1f23b646292c6f3c8eb44f8647' \
   'zeppe-lin/libpkgfetch, ref: 30b894126cdb335b0cfb851cd012833e0699ae72' \
-  'zeppe-lin/libpkgexec, ref: 08814baf2dbc037a037f29dd7de218e5a19c7e77' \
+  'zeppe-lin/libpkgexec, ref: v2.0.0' \
   'zeppe-lin/libpkgbuild-image, ref: a8077e6d6a5143a5a7c6537d001703615562f4e7'
 do
   grep -F "$expected" "$workflow" >/dev/null ||

@@ -45,3 +45,12 @@ Installed qualification must compile and run `tests/installed/consumer.cpp`
 through the installed `libpkgbuild-exec.pc`. Static qualification uses
 `pkg-config --static` so private libarchive/libcrypto/libpkgimage closure is
 proved rather than inferred.
+
+`libpkgbuild-exec` also retains `pkgexec` resource identities, interpreter identity,
+execution request/resources/result, and backend capability profile values by value.
+The libpkgexec 1.x to 2.x correction does not advance this library's ABI: direct
+x86-64 qualification proves those retained carriers and every containing
+`libpkgbuild-exec` public carrier are layout-identical. Future libpkgexec ABI
+generations require the same explicit layout review before widening the accepted
+dependency interval. Shared qualification must prove a direct
+`libpkgexec.so.2` NEEDED edge and refuse obsolete exec generations.

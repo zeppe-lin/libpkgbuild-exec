@@ -83,6 +83,20 @@ foreach name, program : contract_tests
   )
 endforeach
 
+pkgconfig_metadata = find_program('contracts/check_pkgconfig_metadata.sh')
+test(
+  'pkgconfig-metadata',
+  pkgconfig_metadata,
+  args: [meson.project_build_root()],
+  suite: 'contract',
+)
+
+abi_layout = executable(
+  'abi-layout-test',
+  'contracts/abi_layout_test.cpp',
+  dependencies: libpkgbuild_exec_dep,
+)
+test('abi-layout', abi_layout, suite: 'contract')
 
 if library_kind == 'shared'
   abi_surface = find_program('contracts/check_abi_surface.sh')
@@ -97,6 +111,14 @@ if library_kind == 'shared'
   test(
     'fetch-abi-generation',
     fetch_abi_generation,
+    args: [libpkgbuild_exec],
+    suite: 'contract',
+  )
+
+  exec_abi_generation = find_program('contracts/check_exec_abi_generation.sh')
+  test(
+    'exec-abi-generation',
+    exec_abi_generation,
     args: [libpkgbuild_exec],
     suite: 'contract',
   )

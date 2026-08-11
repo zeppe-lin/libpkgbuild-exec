@@ -1,0 +1,76 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: 2026 Alexandr Savca
+# SPDX-License-Identifier: GPL-3.0-or-later
+set -eu
+build_root=${1:?build root required}
+metadata=$build_root/meson-private/libpkgbuild-exec.pc
+fail()
+{
+  echo "metadata-test: $*" >&2
+  if test -n "${metadata:-}" && test -f "$metadata"; then
+    echo '--- generated metadata ---' >&2
+    cat "$metadata" >&2
+    echo '--- end generated metadata ---' >&2
+  fi
+  exit 1
+}
+if test ! -s "$metadata"; then
+  metadata=$(find "$build_root" -type f -name libpkgbuild-exec.pc -print | sed -n '1p')
+fi
+test -n "${metadata:-}" && test -s "$metadata" ||
+  fail 'generated libpkgbuild-exec.pc was not found'
+name=$(sed -n 's/^Name:[[:space:]]*//p' "$metadata")
+test "$name" = libpkgbuild-exec || fail "module name is '$name'"
+version=$(sed -n 's/^Version:[[:space:]]*//p' "$metadata")
+test "$version" = 2.2.0 || fail "module version is '$version'"
+normalize_requirements()
+{
+  sed \
+    -e 's/^[[:space:]]*//' \
+    -e 's/[[:space:]]*$//' \
+    -e 's/[[:space:]][[:space:]]*/ /g' \
+    -e 's/ *\([<>]=\|[<>=]\) */ \1 /' \
+    -e '/^$/d'
+}
+requires=$(sed -n 's/^Requires:[[:space:]]*//p' "$metadata" |
+  tr ',' '\n' | normalize_requirements)
+expected='libpkgbuild >= 3.0.0
+libpkgbuild < 4.0.0
+libpkgbuild-image >= 1.0.0
+libpkgbuild-image < 2.0.0
+libpkgfetch >= 2.0.0
+libpkgfetch < 3.0.0
+libpkgexec >= 2.0.0
+libpkgexec < 3.0.0'
+for requirement in \
+  'libpkgbuild >= 3.0.0' 'libpkgbuild < 4.0.0' \
+  'libpkgbuild-image >= 1.0.0' 'libpkgbuild-image < 2.0.0' \
+  'libpkgfetch >= 2.0.0' 'libpkgfetch < 3.0.0' \
+  'libpkgexec >= 2.0.0' 'libpkgexec < 3.0.0'
+do
+  count=$(printf '%s\n' "$requires" | grep -Fxc "$requirement" || true)
+  test "$count" -eq 1 ||
+    fail "metadata contains $count copies of '$requirement', expected exactly one"
+done
+test "$(printf '%s\n' "$requires" | LC_ALL=C sort)" = \
+     "$(printf '%s\n' "$expected" | LC_ALL=C sort)" ||
+  fail 'public requirements are not the exact build-exec dependency intervals'
+requires_private=$(sed -n 's/^Requires\.private:[[:space:]]*//p' "$metadata" |
+  tr ',' '\n' | normalize_requirements)
+expected_private='libpkgimage >= 0.4.0
+libpkgimage < 1.0.0
+libarchive
+libcrypto'
+for requirement in \
+  'libpkgimage >= 0.4.0' 'libpkgimage < 1.0.0' libarchive libcrypto
+do
+  count=$(printf '%s\n' "$requires_private" | grep -Fxc "$requirement" || true)
+  test "$count" -eq 1 ||
+    fail "private metadata contains $count copies of '$requirement', expected exactly one"
+done
+test "$(printf '%s\n' "$requires_private" | LC_ALL=C sort)" = \
+     "$(printf '%s\n' "$expected_private" | LC_ALL=C sort)" ||
+  fail 'private requirements are not the exact build-exec dependency intervals'
+libs=$(sed -n 's/^Libs:[[:space:]]*//p' "$metadata")
+printf ' %s \n' "$libs" | grep -F ' -lpkgbuild-exec ' >/dev/null ||
+  fail 'metadata omits -lpkgbuild-exec'

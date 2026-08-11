@@ -150,7 +150,7 @@ paths.
 The durable record belongs to this adapter because it binds two independent
 owner results: exact `libpkgexec` process evidence and the corresponding
 `libpkgbuild` outcome, including post-execution artifact sealing evidence.
-The record embeds the canonical `libpkgexec 1.4` execution-result encoding and
+The record embeds the canonical `libpkgexec 2.x` execution-result encoding and
 adds only adapter-owned fields.
 
 The record does not serialize a build request, execution request, backend

@@ -33,4 +33,4 @@ grep -q 'require_receipt_binding' "$codec"
 # Installation and dependency metadata expose the exact new boundary.
 grep -q "result_codec.cpp" "$meson"
 grep -q "result_codec.h" "$meson"
-grep -q "libpkgexec >= 1.4.0" "$meson"
+grep -q "libpkgexec >= 2.0.0" "$meson"

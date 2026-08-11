@@ -2,6 +2,8 @@ Version: 2.2.0
 Date: 2026-08-07
 
 - Freeze the generation-2 ELF ABI to an exact 28-symbol compiler-independent manifest.
+- Bind execution authority to `libpkgexec 2.x` after verifying that all retained execution carriers remain layout-identical across the 1.x to 2.x owner correction.
+- Qualify the shared product against the current resolver-3/build-3/exec-2 dependency closure.
 - Bind the source-materialization dependency to `libpkgfetch 2.x`, the truthful
   SONAME generation for the source-3-shaped values already used by this ABI.
 - Qualify the current split source/state/catalog/resolve/build/fetch/exec/image closure.
