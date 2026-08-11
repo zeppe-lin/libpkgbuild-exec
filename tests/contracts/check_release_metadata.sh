@@ -28,9 +28,29 @@ require_dependency_range libpkgbuild_image_dep libpkgbuild-image "['>=1.0.0', '<
 require_dependency_range libpkgfetch_dep libpkgfetch "['>=2.0.0', '<3.0.0']"
 require_dependency_range libpkgexec_dep libpkgexec "['>=2.0.0', '<3.0.0']"
 require_dependency_range libpkgimage_dep libpkgimage "['>=0.4.0', '<1.0.0']"
+check_dependency_list()
+{
+  variable=$1
+  shift
+  block=$(sed -n "/^${variable} = \[/,/^\]/p" "$root/src/meson.build")
+  expected_count=$#
+  actual_count=$(printf '%s\n' "$block" |
+    grep -Ec '^[[:space:]]+[A-Za-z0-9_]+_dep,$' || true)
+  test "$actual_count" -eq "$expected_count" ||
+    fail "$variable contains $actual_count dependency objects, expected $expected_count"
+  for dependency in "$@"; do
+    count=$(printf '%s\n' "$block" | grep -Fxc "  $dependency," || true)
+    test "$count" -eq 1 ||
+      fail "$variable contains $count copies of $dependency, expected exactly one"
+  done
+}
+check_dependency_list public_deps \
+  libpkgbuild_dep libpkgbuild_image_dep libpkgfetch_dep libpkgexec_dep
+check_dependency_list private_deps \
+  libpkgimage_dep libarchive_dep libcrypto_dep
 require "$root/src/meson.build" "  soversion: '2',"
-require "$root/src/meson.build" "    'libpkgexec >= 2.0.0',"
-require "$root/src/meson.build" "    'libpkgexec < 3.0.0',"
+require "$root/src/meson.build" '  requires: public_deps,'
+require "$root/src/meson.build" '  requires_private: private_deps,'
 require "$root/HISTORY.md" 'Version: 2.2.0'
 require "$root/HISTORY.md" 'libpkgexec 2.x'
 require "$root/README.md" '# libpkgbuild-exec 2.2.0'

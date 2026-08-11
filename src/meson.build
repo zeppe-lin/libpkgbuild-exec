@@ -30,7 +30,11 @@ public_deps = [
   libpkgfetch_dep,
   libpkgexec_dep,
 ]
-private_deps = [libpkgimage_dep, libarchive_dep, libcrypto_dep]
+private_deps = [
+  libpkgimage_dep,
+  libarchive_dep,
+  libcrypto_dep,
+]
 
 libpkgbuild_exec = library(
   'pkgbuild-exec',
@@ -61,20 +65,6 @@ pkgconf.generate(
   filebase: 'libpkgbuild-exec',
   description: 'Native sealed build execution adapter',
   subdirs: '.',
-  requires: [
-    'libpkgbuild >= 3.0.0',
-    'libpkgbuild < 4.0.0',
-    'libpkgbuild-image >= 1.0.0',
-    'libpkgbuild-image < 2.0.0',
-    'libpkgfetch >= 2.0.0',
-    'libpkgfetch < 3.0.0',
-    'libpkgexec >= 2.0.0',
-    'libpkgexec < 3.0.0',
-  ],
-  requires_private: [
-    'libpkgimage >= 0.4.0',
-    'libpkgimage < 1.0.0',
-    'libarchive',
-    'libcrypto',
-  ],
+  requires: public_deps,
+  requires_private: private_deps,
 )
