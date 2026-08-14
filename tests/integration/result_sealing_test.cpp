@@ -8,9 +8,42 @@
 
 #include <iostream>
 
+#include <sys/resource.h>
+
 namespace {
 
 using namespace pkgbuild_exec_test;
+
+
+class nofile_limit_guard final {
+public:
+  explicit nofile_limit_guard(rlim_t value)
+  {
+    require(::getrlimit(RLIMIT_NOFILE, &original_) == 0,
+            "cannot inspect fixture file-descriptor limit");
+    require(original_.rlim_cur >= value && original_.rlim_max >= value,
+            "fixture file-descriptor ceiling is too low");
+    rlimit limited = original_;
+    limited.rlim_cur = value;
+    require(::setrlimit(RLIMIT_NOFILE, &limited) == 0,
+            "cannot lower fixture file-descriptor limit");
+    active_ = true;
+  }
+
+  ~nofile_limit_guard()
+  {
+    if (active_) {
+      (void)::setrlimit(RLIMIT_NOFILE, &original_);
+    }
+  }
+
+  nofile_limit_guard(const nofile_limit_guard&) = delete;
+  nofile_limit_guard& operator=(const nofile_limit_guard&) = delete;
+
+private:
+  rlimit original_{};
+  bool active_ = false;
+};
 
 void publication_is_non_replacing()
 {
@@ -28,6 +61,21 @@ void publication_is_non_replacing()
           "publication replaced existing authoritative bytes");
   require(!result.image_authority(),
           "publication conflict retained successful image authority");
+}
+
+void large_payload_is_descriptor_bounded()
+{
+  fixture_owner owner("large-payload");
+  fixture_backend backend(backend_mode::large_payload);
+  nofile_limit_guard limit(64);
+  const auto result = pkgbuild_exec::execute(owner.get().session(), backend);
+
+  require(result.build().outcome() == pkgbuild::build_outcome::succeeded &&
+              result.build().payload() && result.build().artifact() &&
+              result.image_authority(),
+          "large payload exhausted descriptor authority during sealing");
+  require(result.build().payload()->entries().size() > 256U,
+          "large payload fixture did not exercise descriptor scaling");
 }
 
 void unsupported_output_object_fails_payload_inspection()
@@ -63,6 +111,7 @@ int main()
 {
   try {
     publication_is_non_replacing();
+    large_payload_is_descriptor_bounded();
     unsupported_output_object_fails_payload_inspection();
     empty_output_fails_payload_inspection();
   } catch (const std::exception& value) {

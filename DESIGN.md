@@ -118,9 +118,14 @@ seals canonical paths, object type, permission bits, numeric ownership,
 whole-second modification time, regular-file size and SHA-256, hard-link
 topology, symbolic-link targets, FIFO identity, and device numbers.
 
-Regular files remain open from inspection through archive encoding. Their
-metadata and content digest are checked again while bytes are written. Path
-bindings and directories are rechecked for replacement during traversal.
+Regular-file descriptors are not retained in proportion to payload size.
+Inspection seals each file's inode/metadata, size, and digest, then releases its
+descriptor. Archive encoding retains the exact package-output root, reopens each
+regular path component-by-component with no symlink following, requires the
+original inode/metadata, and rehashes the bytes while writing them. The complete
+payload is inspected again after encoding and must reproduce the same root stamp
+and manifest. Descriptor use is therefore bounded by path depth while pathname,
+metadata, content, hard-link, and directory replacement remain fail-closed.
 Sockets and all unsupported object types fail result sealing.
 
 `package_tar` uses restricted pax and therefore represents modification

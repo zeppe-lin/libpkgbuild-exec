@@ -39,6 +39,7 @@ enum class backend_mode {
   fail_before_start,
   fail_after_start,
   unsupported_payload,
+  large_payload,
   empty_payload,
   wrong_request,
   wrong_backend,
@@ -92,7 +93,8 @@ public:
 
     if (mode_ != backend_mode::empty_payload) {
       emit_payload(output_path(request, resources),
-                   mode_ == backend_mode::unsupported_payload);
+                   mode_ == backend_mode::unsupported_payload,
+                   mode_ == backend_mode::large_payload);
     }
 
     auto evidence_request = request;
@@ -125,7 +127,8 @@ private:
     return resources.materialization(binding.resource()).host_path();
   }
 
-  static void emit_payload(const fs::path& root, bool unsupported)
+  static void emit_payload(const fs::path& root, bool unsupported,
+                           bool large)
   {
     fs::create_directories(root / "usr/bin");
     write_file(root / "usr/bin/payload", "artifact bytes\n", 0755);
@@ -137,6 +140,17 @@ private:
             "cannot create fixture symbolic link");
     require(::mkfifo((root / "usr/bin/pipe").c_str(), 0644) == 0,
             "cannot create fixture fifo");
+
+    if (large) {
+      fs::create_directories(root / "usr/include");
+      for (int index = 0; index < 256; ++index) {
+        const auto header =
+            root / "usr/include" / ("header-" + std::to_string(index) + ".h");
+        write_file(header, "/* fixture header */\n", 0644);
+        set_mtime(header);
+      }
+      set_mtime(root / "usr/include");
+    }
 
     if (unsupported) {
       const int descriptor = ::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);

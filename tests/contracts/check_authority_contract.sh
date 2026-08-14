@@ -64,6 +64,14 @@ grep -q 'image_digest(artifact_digest.first)' "$executor"
 grep -q 'verify_published_binding' "$executor"
 grep -q 'build_image_authority::admit' "$executor"
 ! grep -q 'void verify_image' "$executor"
+grep -q 'open_regular_beneath' "$executor"
+grep -q 'package payload changed during archive encoding' "$executor"
+grep -q 'large_payload_is_descriptor_bounded' \
+  "$root/tests/integration/result_sealing_test.cpp"
+! grep -q 'unique_fd descriptor;' "$executor" || {
+  echo 'payload sealing retains one descriptor per regular file' >&2
+  exit 1
+}
 
 # No shell utility becomes an accidental execution or archive authority.
 if grep -R -E 'system\(|popen\(|execl?p?\(|/usr/bin/(tar|cp|install|ip)' \

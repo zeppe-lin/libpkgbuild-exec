@@ -465,7 +465,6 @@ pkgbuild::payload_time payload_time(const file_stamp& value)
 
 struct retained_regular final {
   pkgbuild::payload_path path;
-  unique_fd descriptor;
   file_stamp stamp;
   std::uint64_t size = 0;
   std::string digest;
@@ -474,6 +473,7 @@ struct retained_regular final {
 struct inspected_payload final {
   pkgbuild::payload_manifest manifest;
   std::vector<retained_regular> regulars;
+  file_stamp root_stamp;
 };
 
 std::vector<std::string> directory_names(int descriptor)
@@ -560,9 +560,6 @@ std::pair<std::string, std::uint64_t> hash_regular(
                                        "reinspect regular file");
   if (!(before == after) || size != static_cast<std::uint64_t>(before.size)) {
     throw error(code, "regular file changed during inspection");
-  }
-  if (::lseek(descriptor, 0, SEEK_SET) < 0) {
-    throw error(code, errno_message("rewind retained regular file", errno));
   }
   return {digest.finish(), size};
 }
@@ -664,8 +661,8 @@ void inspect_directory(
       entries.push_back(pkgbuild::payload_entry::regular(
           path, mode, user, group, observed.second, modification,
           pkgbuild::sha256_digest(observed.first)));
-      regulars.push_back({std::move(path), std::move(file), before,
-                          observed.second, std::move(observed.first)});
+      regulars.push_back({std::move(path), before, observed.second,
+                          std::move(observed.first)});
       continue;
     }
 
@@ -737,7 +734,10 @@ inspected_payload inspect_payload(const fs::path& root)
                 "package output root contains no explicit payload entries");
   }
   auto manifest = pkgbuild::payload_manifest::seal(std::move(entries));
-  return {std::move(manifest), std::move(regulars)};
+  const auto root_stamp = fstat_stamp(
+      directory.get(), error_code::payload_inspection_failed,
+      "retain package output root");
+  return {std::move(manifest), std::move(regulars), root_stamp};
 }
 
 const retained_regular& regular_for(
@@ -955,18 +955,54 @@ private:
   fs::path published_;
 };
 
-void write_regular_payload(archive* output, const retained_regular& regular)
+unique_fd open_regular_beneath(
+    int root, const pkgbuild::payload_path& path)
 {
-  if (::lseek(regular.descriptor.get(), 0, SEEK_SET) < 0) {
+  const int duplicate = ::fcntl(root, F_DUPFD_CLOEXEC, 3);
+  if (duplicate < 0) {
     throw error(error_code::artifact_encoding_failed,
-                errno_message("rewind retained payload", errno));
+                errno_message("duplicate package output root", errno));
+  }
+  unique_fd current(duplicate);
+  const std::string& text = path.string();
+  std::size_t begin = 0;
+  for (;;) {
+    const auto slash = text.find('/', begin);
+    const bool last = slash == std::string::npos;
+    const std::string component =
+        text.substr(begin, last ? std::string::npos : slash - begin);
+    const int flags = O_RDONLY | O_CLOEXEC | O_NOFOLLOW |
+                      (last ? 0 : O_DIRECTORY);
+    unique_fd next(::openat(current.get(), component.c_str(), flags));
+    if (!next) {
+      throw error(error_code::artifact_encoding_failed,
+                  errno_message("reopen package payload", errno));
+    }
+    current = std::move(next);
+    if (last) {
+      return current;
+    }
+    begin = slash + 1U;
+  }
+}
+
+void write_regular_payload(archive* output, int root,
+                           const retained_regular& regular)
+{
+  auto descriptor = open_regular_beneath(root, regular.path);
+  const auto before = fstat_stamp(
+      descriptor.get(), error_code::artifact_encoding_failed,
+      "reinspect reopened payload");
+  if (!(before == regular.stamp) || !S_ISREG(before.mode)) {
+    throw error(error_code::artifact_encoding_failed,
+                "package regular file changed before archive encoding");
   }
   sha256_state digest(error_code::artifact_encoding_failed);
   std::uint64_t size = 0;
   std::array<unsigned char, 65536> buffer{};
   for (;;) {
     const ssize_t count =
-        ::read(regular.descriptor.get(), buffer.data(), buffer.size());
+        ::read(descriptor.get(), buffer.data(), buffer.size());
     if (count < 0 && errno == EINTR) {
       continue;
     }
@@ -994,18 +1030,32 @@ void write_regular_payload(archive* output, const retained_regular& regular)
     size += static_cast<std::uint64_t>(count);
   }
   const file_stamp after = fstat_stamp(
-      regular.descriptor.get(), error_code::artifact_encoding_failed,
-      "reinspect retained payload");
+      descriptor.get(), error_code::artifact_encoding_failed,
+      "reinspect encoded payload");
   if (!(regular.stamp == after) || size != regular.size ||
       digest.finish() != regular.digest) {
     throw error(error_code::artifact_encoding_failed,
-                "retained payload changed during archive encoding");
+                "package regular file changed during archive encoding");
   }
 }
 
 void encode_artifact(const inspected_payload& payload,
+                     const fs::path& package_root,
                      temporary_artifact& temporary)
 {
+  unique_fd root(::open(package_root.c_str(),
+                        O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW));
+  if (!root) {
+    throw error(error_code::artifact_encoding_failed,
+                errno_message("reopen package output root", errno));
+  }
+  if (!(payload.root_stamp == fstat_stamp(
+                                root.get(), error_code::artifact_encoding_failed,
+                                "reinspect package output root"))) {
+    throw error(error_code::artifact_encoding_failed,
+                "package output root changed before archive encoding");
+  }
+
   if (::ftruncate(temporary.descriptor(), 0) != 0 ||
       ::lseek(temporary.descriptor(), 0, SEEK_SET) < 0) {
     throw error(error_code::artifact_encoding_failed,
@@ -1092,7 +1142,8 @@ void encode_artifact(const inspected_payload& payload,
     archive_require(archive_write_header(output.get(), entry.get()),
                     output.get(), "write package_tar header");
     if (item.type() == pkgbuild::payload_entry_type::regular) {
-      write_regular_payload(output.get(), regular_for(payload, item.path()));
+      write_regular_payload(output.get(), root.get(),
+                            regular_for(payload, item.path()));
     }
     archive_require(archive_write_finish_entry(output.get()), output.get(),
                     "finish package_tar entry");
@@ -1100,6 +1151,12 @@ void encode_artifact(const inspected_payload& payload,
 
   archive_require(archive_write_close(output.get()), output.get(),
                   "close package_tar writer");
+  if (!(payload.root_stamp == fstat_stamp(
+                                root.get(), error_code::artifact_encoding_failed,
+                                "reinspect encoded package output root"))) {
+    throw error(error_code::artifact_encoding_failed,
+                "package output root changed during archive encoding");
+  }
   if (::fchmod(temporary.descriptor(), 0444) != 0 ||
       ::fsync(temporary.descriptor()) != 0) {
     throw error(error_code::artifact_encoding_failed,
@@ -1430,7 +1487,13 @@ build_execution_result execute(const admitted_build_session& session,
   try {
     auto payload = inspect_payload(session.paths().package_output_root);
     temporary_artifact temporary(session.paths().artifact_path);
-    encode_artifact(payload, temporary);
+    encode_artifact(payload, session.paths().package_output_root, temporary);
+    auto after_encoding = inspect_payload(session.paths().package_output_root);
+    if (!(payload.root_stamp == after_encoding.root_stamp) ||
+        payload.manifest != after_encoding.manifest) {
+      throw error(error_code::artifact_encoding_failed,
+                  "package payload changed during archive encoding");
+    }
     const auto artifact_digest = hash_artifact(temporary.descriptor());
 
     temporary.publish(session.paths().artifact_path);
