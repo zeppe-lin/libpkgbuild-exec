@@ -440,7 +440,7 @@ pkgexec::environment_policy execution_environment(
       pkgexec::logical_path::parse("/build/work/home"),
       pkgexec::logical_path::parse("/tmp"), policy.parallelism(),
       policy.file_creation_mask(), policy.source_date_epoch(),
-      pkgexec::network_policy::denied, pkgexec::stdin_policy::closed,
+      pkgexec::network_policy::denied, pkgexec::stdin_policy::null_device,
       pkgexec::stream_policy::capture_complete,
       pkgexec::stream_policy::capture_complete, std::move(variables));
 }

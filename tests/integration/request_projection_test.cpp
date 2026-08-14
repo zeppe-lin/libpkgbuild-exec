@@ -56,12 +56,12 @@ void projects_exact_build_contract()
           "execution identity projection changed");
   require(request.environment().network() == pkgexec::network_policy::denied &&
               request.environment().standard_input() ==
-                  pkgexec::stdin_policy::closed &&
+                  pkgexec::stdin_policy::null_device &&
               request.environment().standard_output() ==
                   pkgexec::stream_policy::capture_complete &&
               request.environment().standard_error() ==
                   pkgexec::stream_policy::capture_complete,
-          "closed build process policy changed");
+          "non-interactive build process policy changed");
   require(environment_value(request.environment(), "PKG_SOURCE_ROOT") ==
               "/build/source" &&
               environment_value(request.environment(), "PKG_BUILD_ROOT") ==

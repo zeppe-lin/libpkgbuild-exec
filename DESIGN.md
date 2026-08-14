@@ -94,7 +94,8 @@ execution request with:
 
 - a closed `C.UTF-8`, UTC environment;
 - denied networking;
-- closed standard input and complete stdout/stderr capture;
+- deterministic EOF on standard input through the null device and complete
+  stdout/stderr capture;
 - fixed numeric credentials and `no_new_privileges`;
 - exact read-only source and package-input resources;
 - exact writable workspace, package-output, and private temporary resources;
