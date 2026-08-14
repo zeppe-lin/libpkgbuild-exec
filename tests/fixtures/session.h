@@ -13,17 +13,94 @@
 #include <vector>
 
 #include <libpkgbuild-exec/libpkgbuild-exec.h>
+
+#include <archive.h>
+#include <archive_entry.h>
 #include <libpkgfetch/libpkgfetch.h>
 
 namespace pkgbuild_exec_test {
+
+
+inline std::string archive_fixture_bytes()
+{
+  std::array<unsigned char, 65536> storage{};
+  std::size_t used = 0;
+  archive* raw = archive_write_new();
+  require(raw != nullptr, "cannot allocate source archive fixture writer");
+  std::unique_ptr<archive, decltype(&archive_write_free)> output(
+      raw, archive_write_free);
+  require(archive_write_set_format_pax_restricted(output.get()) == ARCHIVE_OK,
+          "cannot select source archive fixture format");
+  require(archive_write_open_memory(output.get(), storage.data(), storage.size(),
+                                    &used) == ARCHIVE_OK,
+          "cannot open source archive fixture buffer");
+
+  static constexpr std::string_view payload = "archive payload\n";
+  archive_entry* raw_file = archive_entry_new();
+  require(raw_file != nullptr, "cannot allocate source archive fixture file");
+  std::unique_ptr<archive_entry, decltype(&archive_entry_free)> file(
+      raw_file, archive_entry_free);
+  archive_entry_set_pathname(file.get(), "tree/hello.txt");
+  archive_entry_set_filetype(file.get(), AE_IFREG);
+  archive_entry_set_perm(file.get(), 04777);
+  archive_entry_set_uid(file.get(), 1000);
+  archive_entry_set_gid(file.get(), 1000);
+  archive_entry_set_size(file.get(), static_cast<la_int64_t>(payload.size()));
+  archive_entry_set_mtime(file.get(), 1700000000, 0);
+  require(archive_write_header(output.get(), file.get()) == ARCHIVE_OK,
+          "cannot write source archive fixture file header");
+  require(archive_write_data(output.get(), payload.data(), payload.size()) ==
+              static_cast<la_ssize_t>(payload.size()),
+          "cannot write source archive fixture file payload");
+  require(archive_write_close(output.get()) == ARCHIVE_OK,
+          "cannot close source archive fixture writer");
+  return std::string(reinterpret_cast<const char*>(storage.data()), used);
+}
+
+inline std::string single_file_archive_fixture_bytes(
+    std::string_view pathname, std::string_view payload)
+{
+  std::array<unsigned char, 65536> storage{};
+  std::size_t used = 0;
+  archive* raw = archive_write_new();
+  require(raw != nullptr, "cannot allocate custom source archive writer");
+  std::unique_ptr<archive, decltype(&archive_write_free)> output(
+      raw, archive_write_free);
+  require(archive_write_set_format_pax_restricted(output.get()) == ARCHIVE_OK,
+          "cannot select custom source archive format");
+  require(archive_write_open_memory(output.get(), storage.data(), storage.size(),
+                                    &used) == ARCHIVE_OK,
+          "cannot open custom source archive buffer");
+
+  archive_entry* raw_file = archive_entry_new();
+  require(raw_file != nullptr, "cannot allocate custom source archive entry");
+  std::unique_ptr<archive_entry, decltype(&archive_entry_free)> file(
+      raw_file, archive_entry_free);
+  archive_entry_set_pathname(file.get(), std::string(pathname).c_str());
+  archive_entry_set_filetype(file.get(), AE_IFREG);
+  archive_entry_set_perm(file.get(), 0644);
+  archive_entry_set_size(file.get(), static_cast<la_int64_t>(payload.size()));
+  archive_entry_set_mtime(file.get(), 1700000000, 0);
+  require(archive_write_header(output.get(), file.get()) == ARCHIVE_OK,
+          "cannot write custom source archive header");
+  require(archive_write_data(output.get(), payload.data(), payload.size()) ==
+              static_cast<la_ssize_t>(payload.size()),
+          "cannot write custom source archive payload");
+  require(archive_write_close(output.get()) == ARCHIVE_OK,
+          "cannot close custom source archive writer");
+  return std::string(reinterpret_cast<const char*>(storage.data()), used);
+}
 
 class fixture_owner final {
 public:
   explicit fixture_owner(
       std::string suffix,
       std::string payload_bytes = "source bytes\n",
-      std::string archive_bytes = "raw archive bytes\n")
+      std::string archive_bytes = {})
   {
+    if (archive_bytes.empty()) {
+      archive_bytes = archive_fixture_bytes();
+    }
     const fs::path root = fs::temp_directory_path() /
         ("libpkgbuild-exec-test-" + std::to_string(::getpid()) + "-" +
          suffix);

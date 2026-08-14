@@ -22,7 +22,7 @@ test -n "${metadata:-}" && test -s "$metadata" ||
 name=$(sed -n 's/^Name:[[:space:]]*//p' "$metadata")
 test "$name" = libpkgbuild-exec || fail "module name is '$name'"
 version=$(sed -n 's/^Version:[[:space:]]*//p' "$metadata")
-test "$version" = 2.2.0 || fail "module version is '$version'"
+test "$version" = 2.3.0 || fail "module version is '$version'"
 normalize_requirements()
 {
   sed \
@@ -57,11 +57,14 @@ test "$(printf '%s\n' "$requires" | LC_ALL=C sort)" = \
   fail 'public requirements are not the exact build-exec dependency intervals'
 requires_private=$(sed -n 's/^Requires\.private:[[:space:]]*//p' "$metadata" |
   tr ',' '\n' | normalize_requirements)
-expected_private='libpkgimage >= 0.4.0
+expected_private='libpkgsource >= 4.0.0
+libpkgsource < 5.0.0
+libpkgimage >= 0.4.0
 libpkgimage < 1.0.0
 libarchive
 libcrypto'
 for requirement in \
+  'libpkgsource >= 4.0.0' 'libpkgsource < 5.0.0' \
   'libpkgimage >= 0.4.0' 'libpkgimage < 1.0.0' libarchive libcrypto
 do
   count=$(printf '%s\n' "$requires_private" | grep -Fxc "$requirement" || true)

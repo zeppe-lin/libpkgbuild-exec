@@ -63,7 +63,8 @@ inline pkgsource::source_snapshot source_snapshot(
               source_input::local(
                   "archive.tar", "archive.tar",
                   digest(digest_algorithm::sha256,
-                         std::string(second_digest))),
+                         std::string(second_digest)),
+                  source_unpack_kind::archive),
           },
           program(program_language::posix_shell,
                   "install -Dm755 payload /build/package/usr/bin/payload\n"),

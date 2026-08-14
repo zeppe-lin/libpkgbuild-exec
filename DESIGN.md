@@ -83,9 +83,18 @@ to remain a read-only regular file, streamed into an unpublished staged file,
 and hashed again. Its byte count and digest must agree with both
 `libpkgfetch` evidence and the sealed `libpkgbuild` request.
 
-The staged files retain their declared `local_name` and are exposed in one
-read-only source tree. No extension, MIME type, locator, or filename triggers
-archive extraction, decompression, patching, or any other transformation.
+The staged raw files retain their declared `local_name` in the read-only source
+tree. `libpkgsource` is therefore an explicit private implementation dependency
+of this adapter rather than an incidental transitive edge through fetch/build.
+A source whose sealed `unpack_kind()` is `archive` is additionally decoded
+through the adapter's private source-archive backend into the writable build
+workspace before execution. This is the centralized form of the old recipe-local
+`tar -xf` effect: raw source authority remains immutable while build tools may
+modify their realized work tree. Archive format recognition is never inferred
+from extension, MIME type, locator, or filename. The libarchive provider decodes
+entries; this adapter owns path containment, collision refusal, object-type
+admission, ownership disregard, admitted-umask mode realization, and filesystem
+effects.
 
 ## Execution translation
 

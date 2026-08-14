@@ -1,3 +1,14 @@
+Version: 2.3.0
+Date: 2026-08-14
+
+- Realize only explicitly declared source archives before isolated execution.
+- Keep verified raw source objects present under their sealed local names.
+- Decode archives through a private libarchive backend while owning path, type,
+  collision, ownership, and permission policy inside this adapter.
+- Refuse escaping links, duplicate paths, special objects, and archive-entry
+  collisions; never infer archive semantics from filenames.
+- Preserve the shared-library SONAME at 2; the public adapter ABI is unchanged.
+
 Version: 2.2.0
 Date: 2026-08-07
 

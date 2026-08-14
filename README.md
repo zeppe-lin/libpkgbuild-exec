@@ -1,4 +1,4 @@
-# libpkgbuild-exec 2.2.0
+# libpkgbuild-exec 2.3.0
 
 `libpkgbuild-exec` is the native build-execution adapter for Zeppe-Lin.
 It realizes one sealed `libpkgbuild` request through a caller-supplied,
@@ -7,7 +7,8 @@ backend-neutral `libpkgexec` execution authority.
 The adapter combines:
 
 - a sealed build request from `libpkgbuild`;
-- verified raw source objects from `libpkgfetch`;
+- verified raw source objects from `libpkgfetch`, with realization only when
+  `libpkgsource` explicitly declares archive unpacking;
 - explicit call-scoped host resources for every resolver-issued build and check input;
 - an explicit root view, interpreter identity, credentials, and session paths;
 - an injected `pkgexec::execution_backend`.

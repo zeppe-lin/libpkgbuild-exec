@@ -9,6 +9,7 @@
 #include <libpkgimage/libarchive_backend.h>
 
 #include "result_identity.h"
+#include "source_archive_backend.h"
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -1415,6 +1416,36 @@ prepared_execution prepare(const admitted_build_session& session)
   }
   for (const auto& object : session.sources().objects()) {
     stage_source_object(object, source_directory.get());
+  }
+  unique_fd workspace_directory(::open(paths.workspace.c_str(),
+                                        O_RDONLY | O_DIRECTORY | O_CLOEXEC |
+                                            O_NOFOLLOW));
+  if (!workspace_directory) {
+    throw error(error_code::source_staging_failed,
+                errno_message("open build workspace for source realization",
+                              errno));
+  }
+  auto archive_backend = detail::make_libarchive_source_archive_backend();
+  for (const auto& object : session.sources().objects()) {
+    if (object.declaration().unpack_kind() !=
+        pkgsource::source_unpack_kind::archive) {
+      continue;
+    }
+    unique_fd staged(::openat(source_directory.get(),
+                              object.declaration().local_name().c_str(),
+                              O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+    if (!staged) {
+      throw error(error_code::source_staging_failed,
+                  errno_message("open staged source archive", errno));
+    }
+    archive_backend->unpack(
+        staged.get(), workspace_directory.get(),
+        static_cast<mode_t>(session.request().policy().environment()
+                                .file_creation_mask()));
+  }
+  if (::fsync(workspace_directory.get()) != 0) {
+    throw error(error_code::source_staging_failed,
+                errno_message("synchronize realized source workspace", errno));
   }
   if (::fsync(source_directory.get()) != 0 ||
       ::fchmod(source_directory.get(), 0555) != 0) {

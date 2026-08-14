@@ -31,6 +31,7 @@ public_deps = [
   libpkgexec_dep,
 ]
 private_deps = [
+  libpkgsource_dep,
   libpkgimage_dep,
   libarchive_dep,
   libcrypto_dep,
@@ -38,7 +39,7 @@ private_deps = [
 
 libpkgbuild_exec = library(
   'pkgbuild-exec',
-  ['error.cpp', 'model.cpp', 'result_identity.cpp', 'result_codec.cpp', 'executor.cpp'],
+  ['error.cpp', 'model.cpp', 'result_identity.cpp', 'result_codec.cpp', 'source_archive_libarchive.cpp', 'executor.cpp'],
   cpp_args: ['-D_FILE_OFFSET_BITS=64'],
   include_directories: public_inc,
   dependencies: public_deps + private_deps,

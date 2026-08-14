@@ -80,9 +80,18 @@ if grep -R -E 'system\(|popen\(|execl?p?\(|/usr/bin/(tar|cp|install|ip)' \
   exit 1
 fi
 
-# Source transformation is deliberately absent from implementation.
-if grep -R -E 'extract|unpack|decompress' "$root/include" "$root/src" \
-    >/dev/null; then
-  echo 'source transformation entered the build-execution adapter' >&2
+# Source realization is explicit semantic authority, never filename inference.
+grep -q 'object.declaration().unpack_kind()' "$executor"
+grep -q 'source_unpack_kind::archive' "$executor"
+grep -q 'make_libarchive_source_archive_backend' "$executor"
+grep -q 'archive_read_support_filter_all' "$root/src/source_archive_libarchive.cpp"
+grep -q 'archive_read_support_format_all' "$root/src/source_archive_libarchive.cpp"
+grep -q 'archive symbolic link escapes the source tree' \
+  "$root/src/source_archive_libarchive.cpp"
+grep -q 'archive entry collides with an existing source path' \
+  "$root/src/source_archive_libarchive.cpp"
+! grep -R -E '\.(tar|tgz|txz|zip|gz|xz).*unpack|ends_with.*(tar|zip|gz|xz)' \
+  "$root/src" >/dev/null 2>&1 || {
+  echo 'filename inference entered source realization' >&2
   exit 1
-fi
+}
