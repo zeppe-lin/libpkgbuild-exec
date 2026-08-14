@@ -32,7 +32,8 @@ inline void write_file(const fs::path& path, std::string_view bytes,
 inline std::string read_file(const fs::path& path)
 {
   std::ifstream input(path, std::ios::binary);
-  require(static_cast<bool>(input), "cannot open fixture file");
+  require(static_cast<bool>(input),
+          "cannot open fixture file: " + path.string());
   return {std::istreambuf_iterator<char>(input),
           std::istreambuf_iterator<char>()};
 }
