@@ -26,8 +26,8 @@ identity strings. Decoder code must remain free of host paths and effects.
 
 ## ABI release gate
 
-`libpkgbuild-exec` 2.x is the corrected logical-input ABI generation. Before
-2.2.0 is tagged, the shared ELF surface is frozen to the reviewed 28-symbol
+`libpkgbuild-exec` 3.x is the source-4/fetch-3 retaining ABI generation. The
+shared ELF surface remains the reviewed 28-symbol
 `abi/libpkgbuild-exec.exports` manifest. GCC and Clang shared builds must match
 that manifest exactly. Private constructors, `detail` implementation helpers,
 and standard-library implementation symbols are not compatibility surface.
@@ -36,13 +36,13 @@ A dependency SONAME change is not by itself a reason to advance this library's
 SONAME. Advance the provider ABI only when a public `libpkgbuild-exec` signature,
 layout, virtual protocol, or other binary contract changes.
 
-`admitted_build_session` retains `pkgfetch::source_materialization` by value. A
-future `libpkgfetch` ABI generation therefore requires an explicit layout and
-public-ABI review before widening the accepted dependency range. The 1.x to 2.x
-fetch correction does not advance `libpkgbuild-exec` ABI generation: the r57
-2.2.0 ABI was already compiled against the source-3-shaped fetch headers, and
-`libpkgfetch 2.0.0` changes their SONAME/owner metadata without changing those
-public headers. Shared qualification must prove a `libpkgfetch.so.2` NEEDED edge.
+`admitted_build_session` retains `pkgfetch::source_materialization` by value.
+The fetch 2.x to 3.x transition changes that carrier because fetch 3 is rebuilt
+against source ABI 4; this therefore advances the adapter to
+`libpkgbuild-exec.so.3`. Future `libpkgfetch` ABI generations require the same
+explicit carrier-layout and public-ABI review before widening the accepted
+dependency range. Shared qualification must prove a `libpkgfetch.so.3` NEEDED
+edge and refuse older fetch generations.
 
 Installed qualification must compile and run `tests/installed/consumer.cpp`
 through the installed `libpkgbuild-exec.pc`. Static qualification uses

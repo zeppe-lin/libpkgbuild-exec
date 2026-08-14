@@ -3,7 +3,7 @@
 project(
   'libpkgbuild-exec',
   'cpp',
-  version: '2.3.0',
+  version: '3.0.0',
   license: 'GPL-3.0-or-later',
   meson_version: '>=1.2.0',
   default_options: [
@@ -43,28 +43,28 @@ libpkgsource_dep = dependency(
 )
 libpkgbuild_dep = dependency(
   'libpkgbuild',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=3.0.1', '<4.0.0'],
   required: true,
   static: want_static,
   fallback: ['libpkgbuild', 'libpkgbuild_dep'],
 )
 libpkgbuild_image_dep = dependency(
   'libpkgbuild-image',
-  version: ['>=1.0.0', '<2.0.0'],
+  version: ['>=1.0.1', '<2.0.0'],
   required: true,
   static: want_static,
   fallback: ['libpkgbuild-image', 'libpkgbuild_image_dep'],
 )
 libpkgfetch_dep = dependency(
   'libpkgfetch',
-  version: ['>=2.0.0', '<3.0.0'],
+  version: ['>=3.0.0', '<4.0.0'],
   required: true,
   static: want_static,
   fallback: ['libpkgfetch', 'libpkgfetch_dep'],
 )
 libpkgexec_dep = dependency(
   'libpkgexec',
-  version: ['>=2.0.0', '<3.0.0'],
+  version: ['>=2.1.1', '<3.0.0'],
   required: true,
   static: want_static,
   fallback: ['libpkgexec', 'libpkgexec_dep'],

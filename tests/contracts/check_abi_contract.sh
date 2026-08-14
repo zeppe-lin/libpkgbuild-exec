@@ -28,8 +28,8 @@ grep -F '_ZN13pkgbuild_exec29decode_build_execution_result' "$manifest" >/dev/nu
   fail 'durable decoder is absent from reviewed ABI'
 grep -F '_ZTIN13pkgbuild_exec5errorE' "$manifest" >/dev/null ||
   fail 'public error RTTI is absent from reviewed ABI'
-grep -F "soversion: '2'" "$root/src/meson.build" >/dev/null ||
-  fail 'SONAME generation changed unexpectedly'
+grep -F "soversion: '3'" "$root/src/meson.build" >/dev/null ||
+  fail 'SONAME generation is not 3'
 grep -F -- '--version-script=' "$root/src/meson.build" >/dev/null ||
   fail 'reviewed ELF export manifest is not linked'
 grep -F "../abi/libpkgbuild-exec.exports" "$root/src/meson.build" >/dev/null ||

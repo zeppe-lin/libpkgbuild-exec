@@ -9,18 +9,18 @@ qualify=$root/ci/qualify.sh
 consumer=$root/tests/installed/consumer.cpp
 
 for expected in \
-  'zeppe-lin/libpkgsource, ref: d5f30663a4e56c2319f301ca762741106dea1bd0' \
-  'zeppe-lin/libpkgstate, ref: f74df278b47b48e798c3de01c922c59b58319d13' \
-  'zeppe-lin/libpkgimage, ref: 284324996dce673e1a96d73f8adb90b29dbb79f5' \
-  'zeppe-lin/libpkgcatalog, ref: 16976cac176f576871e327d5d2f6fe9d9dfa0666' \
-  'zeppe-lin/libpkgresolve, ref: 46c19d5d17a3e232597bf4c588733ad92db2dfbf' \
-  'zeppe-lin/libpkgbuild, ref: f6c13ed438b5e448f53b0603f060c339018e9f32' \
-  'zeppe-lin/libpkgfetch, ref: ab3024f7897f40b2b0302f9ee3d4e53868d8a28e' \
-  'zeppe-lin/libpkgexec, ref: 351cd87b86c3b007f4a9789a3f6948a27d9b29c3' \
-  'zeppe-lin/libpkgbuild-image, ref: a8077e6d6a5143a5a7c6537d001703615562f4e7'
+  'zeppe-lin/libpkgsource, ref: v4.1.0' \
+  'zeppe-lin/libpkgstate, ref: 94e59e64b842a396bf5bb9eacc0f262c1e266c5f' \
+  'zeppe-lin/libpkgimage, ref: 179f14759b48f006dc922579314d56637f0522a8' \
+  'zeppe-lin/libpkgcatalog, ref: v4.0.0' \
+  'zeppe-lin/libpkgresolve, ref: v4.0.0' \
+  'zeppe-lin/libpkgbuild, ref: v3.0.1' \
+  'zeppe-lin/libpkgfetch, ref: v3.0.0' \
+  'zeppe-lin/libpkgexec, ref: v2.1.1' \
+  'zeppe-lin/libpkgbuild-image, ref: v1.0.1'
 do
-  grep -F "$expected" "$workflow" >/dev/null ||
-    fail "current authority checkout is absent: $expected"
+  count=$(grep -F "$expected" "$workflow" | wc -l | tr -d ' ')
+  [ "$count" -eq 2 ] || fail "current authority checkout count is $count, expected 2: $expected"
 done
 ! grep -F 'yaml_adapter' "$workflow" >/dev/null ||
   fail 'obsolete embedded YAML adapter option remains in CI'

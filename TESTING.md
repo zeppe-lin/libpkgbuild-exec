@@ -13,8 +13,8 @@ Meson suites:
 - `contract`
 
 The shared build also runs an exact ELF ABI-surface contract.
-It also verifies that the built DSO names `libpkgfetch.so.2` directly, so release
-metadata cannot claim generation 2 while the binary still closes over an obsolete
+It also verifies that the built DSO names `libpkgfetch.so.3` directly, so release
+metadata cannot claim generation 3 while the binary still closes over an obsolete
 fetch SONAME.
 The same shared-product gate requires `libpkgexec.so.2` and refuses exec 0/1.
 An x86-64 ABI-layout contract freezes every retained execution carrier plus the
@@ -149,7 +149,7 @@ libpkgbuild-exec`, forcing the private image/archive/crypto closure. For shared
 builds the runtime uses only the installed product and qualified dependency
 prefixes.
 
-The generation-2 ELF ABI is the exact 28-symbol manifest in
+The generation-3 ELF ABI is the exact 28-symbol manifest in
 `abi/libpkgbuild-exec.exports`. `abi-surface` compares the built shared object to
 that manifest; compiler-specific template/STL debris and private implementation
 symbols are release failures.

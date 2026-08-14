@@ -47,7 +47,7 @@ libpkgbuild_exec = library(
   link_depends: library_link_depends,
   install: true,
   version: meson.project_version(),
-  soversion: '2',
+  soversion: '3',
 )
 
 libpkgbuild_exec_dep = declare_dependency(

@@ -1,3 +1,17 @@
+Version: 3.0.0
+Date: 2026-08-14
+
+- Rebuild `admitted_build_session` against `libpkgfetch.so.3` and advance the
+  adapter SONAME to `libpkgbuild-exec.so.3`. The public session retains
+  `pkgfetch::source_materialization` by value, so fetch's source-4 carrier ABI
+  change is part of this adapter's binary contract even though its exported
+  symbol names remain stable.
+- Require `libpkgfetch >= 3.0.0, < 4.0.0`; refuse every source-3 retaining
+  fetch generation at build, pkg-config, CI, and shared-object qualification.
+- Preserve build-execution identity domains, durable evidence schema, source
+  archive realization semantics, and the reviewed 28-symbol export inventory.
+  This is an ABI-carrier rebuild, not a semantic reconstruction.
+
 Version: 2.3.0
 Date: 2026-08-14
 
@@ -8,6 +22,12 @@ Date: 2026-08-14
 - Refuse escaping links, duplicate paths, special objects, and archive-entry
   collisions; never infer archive semantics from filenames.
 - Preserve the shared-library SONAME at 2; the public adapter ABI is unchanged.
+- Require `libpkgbuild >= 3.0.1` and `libpkgbuild-image >= 1.0.1` so the
+  source-realization adapter cannot admit a resolver-3 transitive build closure.
+- Require `libpkgfetch >= 2.1.1` and `libpkgexec >= 2.1.1`, excluding
+  the tagged generation-2 providers that still admitted source ABI 3.
+- Qualify the 2.3 boundary against source 4, catalog 4, resolver 4, and the
+  resolver-4-bound build/image admission releases.
 
 Version: 2.2.0
 Date: 2026-08-07
