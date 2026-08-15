@@ -9,6 +9,7 @@ integration_tests = {
   'session-admission': 'integration/session_admission_test.cpp',
   'request-projection': 'integration/request_projection_test.cpp',
   'preparation': 'integration/preparation_test.cpp',
+  'source-archive': 'integration/source_archive_test.cpp',
   'backend-contract': 'integration/backend_contract_test.cpp',
   'execution-failure': 'integration/execution_failure_test.cpp',
   'execution-success': 'integration/execution_success_test.cpp',

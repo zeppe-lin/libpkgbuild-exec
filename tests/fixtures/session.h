@@ -21,6 +21,82 @@
 namespace pkgbuild_exec_test {
 
 
+
+struct archive_fixture_entry final {
+  archive_fixture_entry(std::string pathname_value,
+                        mode_t filetype_value = AE_IFREG,
+                        mode_t permissions_value = 0644,
+                        std::string payload_value = {},
+                        std::string symlink_target_value = {},
+                        std::string hardlink_target_value = {},
+                        std::int64_t mtime_value = 1700000000)
+      : pathname(std::move(pathname_value)), filetype(filetype_value),
+        permissions(permissions_value), payload(std::move(payload_value)),
+        symlink_target(std::move(symlink_target_value)),
+        hardlink_target(std::move(hardlink_target_value)), mtime(mtime_value)
+  {
+  }
+
+  std::string pathname;
+  mode_t filetype;
+  mode_t permissions;
+  std::string payload;
+  std::string symlink_target;
+  std::string hardlink_target;
+  std::int64_t mtime;
+};
+
+inline std::string archive_fixture_bytes(
+    const std::vector<archive_fixture_entry>& entries)
+{
+  std::array<unsigned char, 131072> storage{};
+  std::size_t used = 0;
+  archive* raw = archive_write_new();
+  require(raw != nullptr, "cannot allocate custom source archive writer");
+  std::unique_ptr<archive, decltype(&archive_write_free)> output(
+      raw, archive_write_free);
+  require(archive_write_set_format_pax_restricted(output.get()) == ARCHIVE_OK,
+          "cannot select custom source archive format");
+  require(archive_write_open_memory(output.get(), storage.data(), storage.size(),
+                                    &used) == ARCHIVE_OK,
+          "cannot open custom source archive buffer");
+
+  for (const auto& specification : entries) {
+    archive_entry* raw_entry = archive_entry_new();
+    require(raw_entry != nullptr, "cannot allocate custom source archive entry");
+    std::unique_ptr<archive_entry, decltype(&archive_entry_free)> entry(
+        raw_entry, archive_entry_free);
+    archive_entry_set_pathname(entry.get(), specification.pathname.c_str());
+    archive_entry_set_filetype(entry.get(), specification.filetype);
+    archive_entry_set_perm(entry.get(), specification.permissions);
+    archive_entry_set_uid(entry.get(), 1000);
+    archive_entry_set_gid(entry.get(), 1000);
+    archive_entry_set_mtime(entry.get(), specification.mtime, 0);
+    if (!specification.symlink_target.empty())
+      archive_entry_set_symlink(entry.get(), specification.symlink_target.c_str());
+    if (!specification.hardlink_target.empty())
+      archive_entry_set_hardlink(entry.get(), specification.hardlink_target.c_str());
+    if (specification.filetype == AE_IFREG &&
+        specification.hardlink_target.empty())
+      archive_entry_set_size(
+          entry.get(), static_cast<la_int64_t>(specification.payload.size()));
+    else
+      archive_entry_set_size(entry.get(), 0);
+    require(archive_write_header(output.get(), entry.get()) == ARCHIVE_OK,
+            "cannot write custom source archive header");
+    if (specification.filetype == AE_IFREG &&
+        specification.hardlink_target.empty() && !specification.payload.empty()) {
+      require(archive_write_data(output.get(), specification.payload.data(),
+                                 specification.payload.size()) ==
+                  static_cast<la_ssize_t>(specification.payload.size()),
+              "cannot write custom source archive payload");
+    }
+  }
+  require(archive_write_close(output.get()) == ARCHIVE_OK,
+          "cannot close custom source archive writer");
+  return std::string(reinterpret_cast<const char*>(storage.data()), used);
+}
+
 inline std::string archive_fixture_bytes()
 {
   std::array<unsigned char, 65536> storage{};

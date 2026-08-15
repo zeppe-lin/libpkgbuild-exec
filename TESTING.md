@@ -90,6 +90,14 @@ with the exact writable workspace/output/temporary resources. Provider failures
 are translated back into `libpkgbuild-exec` source-staging vocabulary. Archive
 expansion, when declared, occurs only in the writable build workspace.
 
+`source-archive` attacks the concrete libarchive implementation independently of
+normal preparation. It proves safe relative symlinks and already-extracted
+hardlinks, deterministic metadata/umask handling, and fail-closed refusal of
+absolute or dot-dot paths, escaping symlinks/hardlinks, forward hardlinks,
+duplicate entries, parent/non-directory collisions, unsupported object types,
+raw data, and empty archives. Source extraction is never allowed to discover
+these tree-shape rules for the first time in a distribution tarball.
+
 `backend-contract` proves capability observation and execution are both
 exception-contained. Returned execution evidence must name the exact projected
 request and the exact capability profile advertised before preparation. Both
