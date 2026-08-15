@@ -92,6 +92,8 @@ void projects_exact_build_contract()
                   "/build/work" &&
               environment_value(request.environment(), "PKG_DESTDIR") ==
                   "/build/package" &&
+              environment_value(request.environment(), "PKG_BUILD_INPUT_ROOT") ==
+                  "/build/inputs" &&
               environment_value(request.environment(), "PKG_BUILD_INPUTS") ==
                   expected_build_input_names(owner.get().request) &&
               !has_environment_variable(request.environment(),
@@ -135,7 +137,7 @@ void projects_exact_build_contract()
   require(source.access() == pkgexec::resource_access::read_only &&
               source.mount_point().string() == "/build/source" &&
               build.access() == pkgexec::resource_access::read_only &&
-              build.mount_point().string() == "/build/inputs/build/tool" &&
+              build.mount_point().string() == "/build/inputs/tool" &&
               workspace.access() == pkgexec::resource_access::writable &&
               workspace.mount_point().string() == "/build/work" &&
               output.access() == pkgexec::resource_access::writable &&

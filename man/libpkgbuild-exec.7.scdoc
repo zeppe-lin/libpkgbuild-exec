@@ -7,8 +7,8 @@ libpkgbuild-exec - native sealed build-execution adapter
 # DESCRIPTION
 
 *libpkgbuild-exec* admits one exact *libpkgbuild* request, one matching
-*libpkgfetch* source materialization, explicit call-scoped host resources for all resolver-issued package
-inputs, and explicit execution coordinates. It translates that authority into
+*libpkgfetch* source materialization, explicit call-scoped host resources for resolver-issued build inputs,
+and explicit execution coordinates. It translates that authority into
 a backend-neutral *libpkgexec* build request.
 
 *seal_execution_request()* reproduces that exact request without touching host
@@ -20,8 +20,10 @@ exact declared local names, and exposed read-only. No archive extraction or
 source transformation is inferred.
 
 The build executes with a closed environment, fixed numeric credentials,
-complete output capture, and denied networking. The caller selects and owns
-the execution backend and the exact root view.
+complete output capture, and denied networking. Build dependencies are exposed
+read-only beneath *PKG_BUILD_INPUT_ROOT=/build/inputs* by canonical package
+name. The caller selects and owns the execution backend and the exact root
+view.
 
 After successful execution, the complete package output root is inspected
 without following symlinks. The adapter encodes an uncompressed package-tar

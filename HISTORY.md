@@ -1,3 +1,16 @@
+Version: 3.3.0
+Date: 2026-08-15
+
+- Normalize the recipe-facing build-input namespace to the phase-local
+  `PKG_BUILD_INPUT_ROOT=/build/inputs`; each admitted build dependency is
+  projected at `/build/inputs/<canonical-package-name>`.
+- Remove the obsolete `/build/inputs/build` nesting left behind when concrete
+  check inputs moved out of construction. Exact admission remains keyed by
+  `pkgbuild::build_input_identity`; only the execution coordinate changes.
+- Preserve `libpkgbuild-exec.so.3`: no public C++ carrier, signature, layout, or
+  virtual protocol changes. The canonical execution request identity changes
+  naturally because its environment and logical mount points change.
+
 Version: 3.2.0
 Date: 2026-08-15
 

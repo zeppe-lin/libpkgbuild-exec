@@ -374,7 +374,7 @@ pkgexec::environment_policy execution_environment(
   variables.emplace_back("PKG_SOURCE_ROOT", "/build/source");
   variables.emplace_back("PKG_BUILD_ROOT", "/build/work");
   variables.emplace_back("PKG_DESTDIR", "/build/package");
-  variables.emplace_back("PKG_BUILD_INPUT_ROOT", "/build/inputs/build");
+  variables.emplace_back("PKG_BUILD_INPUT_ROOT", "/build/inputs");
   variables.emplace_back("PKG_BUILD_INPUTS",
                          join_input_names(request, pkgbuild::input_scope::build));
   variables.emplace_back("PKG_BUILD_ARCH",
@@ -1500,7 +1500,7 @@ pkgexec::execution_request seal_execution_request(
         pkgexec::resource_role::build_input_tree, name);
     bindings.emplace_back(
         slot, supplied.resource, pkgexec::resource_access::read_only,
-        pkgexec::logical_path::parse("/build/inputs/build/" + name));
+        pkgexec::logical_path::parse("/build/inputs/" + name));
   }
 
   const auto workspace_slot = pkgexec::resource_slot::singleton(

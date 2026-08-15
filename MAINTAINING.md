@@ -73,3 +73,8 @@ but this adapter concretizes only `pkgbuild::input_scope::build`. Do not add
 `PKG_CHECK_INPUT_ROOT`, `PKG_CHECK_INPUTS`, `check_input_tree` bindings, or
 check-scoped `package_input_resource` admission here. Concrete check inputs
 belong to the independent check execution composition.
+
+The build recipe namespace is phase-local. Keep `PKG_BUILD_INPUT_ROOT` equal to
+`/build/inputs` and project each admitted dependency directly beneath that root
+by canonical package name. Do not reintroduce `/build/inputs/build`: the extra
+scope component belonged to the retired dual-scope construction model.

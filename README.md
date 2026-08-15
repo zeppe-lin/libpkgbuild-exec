@@ -1,4 +1,4 @@
-# libpkgbuild-exec 3.2.0
+# libpkgbuild-exec 3.3.0
 
 `libpkgbuild-exec` is the native build-execution adapter for Zeppe-Lin.
 It realizes one sealed `libpkgbuild` request through a caller-supplied,
@@ -13,6 +13,9 @@ The adapter combines:
 - explicit call-scoped host resources for resolver-issued build inputs only;
   check-scoped inputs remain sealed logical request authority for the independent
   check phase and are never mounted into construction;
+  build inputs are exposed to recipes beneath the phase-local
+  `PKG_BUILD_INPUT_ROOT=/build/inputs` namespace as
+  `PKG_BUILD_INPUT_ROOT/<canonical-package-name>`;
 - an explicit root view, interpreter identity, credentials, and session paths;
 - an injected `pkgexec::execution_backend`.
 

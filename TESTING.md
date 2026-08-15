@@ -74,6 +74,9 @@ selection belongs to orchestration; the fixture backend returns real sealed
 - pure build-purpose request sealing performs no host mutation;
 - exact program, interpreter, root, credentials, environment, input lists,
   mount points, access modes, and working directory are retained;
+- the build recipe namespace is phase-local: `PKG_BUILD_INPUT_ROOT` is exactly
+  `/build/inputs`, and each build dependency is mounted directly beneath it by
+  canonical package name;
 - the required guarantee set is exactly the policy derived from the sealed
   request;
 - no limits or cancellation policy are invented;

@@ -59,8 +59,12 @@ A package-input resource deliberately keeps three facts separate: the logical
 input identity owned by `libpkgbuild`, the semantic resource identity consumed
 by `libpkgexec`, and the host path at which that resource is available for this
 call. The adapter matches those facts and asks the execution backend to expose
-the resource read-only. Session admission rejects distinct logical inputs that
-share one semantic resource identity. Pure request projection additionally
+the resource read-only. Recipe addressing is a fourth, execution-local concern:
+build inputs are projected beneath `PKG_BUILD_INPUT_ROOT=/build/inputs` at
+`/build/inputs/<canonical-package-name>`. The historical extra `build/` child is
+not semantic authority and is not retained after check inputs leave construction.
+Session admission rejects distinct logical inputs that share one semantic
+resource identity. Pure request projection additionally
 rejects a package-input resource that aliases an adapter-owned source, workspace,
 package-output, or temporary resource, before effectful preparation mutates any
 host path. The adapter does not issue or verify a content-addressed package-tree
