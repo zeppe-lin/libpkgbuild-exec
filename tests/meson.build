@@ -73,6 +73,7 @@ contract_tests = {
   'test-layout': 'contracts/check_test_layout.sh',
   'abi-contract': 'contracts/check_abi_contract.sh',
   'ci-contract': 'contracts/check_ci_contract.sh',
+  'source-resource-boundary': 'contracts/check_source_resource_boundary.sh',
 }
 foreach name, program : contract_tests
   test(

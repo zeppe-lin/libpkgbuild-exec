@@ -70,31 +70,29 @@ source, package-input, workspace, package-output, temporary, root-view,
 interpreter, environment, credential, limit, and cancellation authorities later
 used by execution.
 
-`prepare()` is the effect boundary. It realizes the staged source and writable
+`prepare()` is the effect boundary. It asks `libpkgsource-exec` to recreate the
+phase-neutral raw source-object resource, realizes writable adapter-owned
 directories, calls the pure projection, and admits host materializations for its
 exact resource slots. A restart path may therefore reproduce request authority
 without invoking destructive workspace preparation.
 
 ## Source realization
 
-A digest-shaped store path is not trusted by itself. Before execution, each
-verified source object is reopened without following a final symlink, required
-to remain a read-only regular file, streamed into an unpublished staged file,
-and hashed again. Its byte count and digest must agree with both
-`libpkgfetch` evidence and the sealed `libpkgbuild` request.
+Raw source-object realization is delegated to `libpkgsource-exec`. That provider
+reopens and rehashes the exact `pkgfetch::source_materialization`, exposes each
+object under its declared `local_name`, seals the tree read-only, and derives one
+phase-neutral resource identity from materialization authority. Build therefore
+uses the same raw-source resource semantics that another execution phase may
+recreate without borrowing this adapter's private staging implementation.
 
-The staged raw files retain their declared `local_name` in the read-only source
-tree. `libpkgsource` is therefore an explicit private implementation dependency
-of this adapter rather than an incidental transitive edge through fetch/build.
-A source whose sealed `unpack_kind()` is `archive` is additionally decoded
-through the adapter's private source-archive backend into the writable build
-workspace before execution. This is the centralized form of the old recipe-local
-`tar -xf` effect: raw source authority remains immutable while build tools may
-modify their realized work tree. Archive format recognition is never inferred
-from extension, MIME type, locator, or filename. The libarchive provider decodes
-entries; this adapter owns path containment, collision refusal, object-type
-admission, ownership disregard, admitted-umask mode realization, and filesystem
-effects.
+A source whose sealed `unpack_kind()` is `archive` is additionally decoded by
+this adapter's private source-archive backend into the writable build workspace
+before execution. That second transformation remains build-specific: it creates
+mutable construction work from immutable raw source authority. Archive format
+recognition is never inferred from extension, MIME type, locator, or filename.
+The libarchive provider decodes entries; this adapter owns build-workspace path
+containment, collision refusal, object-type admission, ownership disregard,
+admitted-umask mode realization, and filesystem effects.
 
 ## Execution translation
 

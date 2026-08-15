@@ -3,11 +3,12 @@
 Keep semantic authority in the owning core library. This repository may admit,
 translate, and realize sealed contracts; it must not silently extend them.
 
-Source acquisition belongs to `libpkgfetch`. Build identity and payload/result
-semantics belong to `libpkgbuild`. Execution semantics belong to `libpkgexec`.
-Package-image interpretation belongs to `libpkgimage`. Declared source archive
-decoding is an adapter-owned realization mechanism behind the private
-source-archive backend. Linux mechanism belongs to
+Source acquisition belongs to `libpkgfetch`. Phase-neutral raw source-object
+execution resources belong to `libpkgsource-exec`. Build identity and
+payload/result semantics belong to `libpkgbuild`. Execution semantics belong to
+`libpkgexec`. Package-image interpretation belongs to `libpkgimage`. Declared
+source archive decoding into the mutable build workspace is an adapter-owned
+realization mechanism behind the private source-archive backend. Linux mechanism belongs to
 `libpkgexec-linux` and remains injected by orchestration.
 
 Changes that infer source extraction from filenames, extend source semantics

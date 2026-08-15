@@ -32,6 +32,7 @@ public_deps = [
 ]
 private_deps = [
   libpkgsource_dep,
+  libpkgsource_exec_dep,
   libpkgimage_dep,
   libarchive_dep,
   libcrypto_dep,

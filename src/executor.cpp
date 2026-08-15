@@ -7,6 +7,7 @@
 
 #include <libpkgbuild-exec/error.h>
 #include <libpkgimage/libarchive_backend.h>
+#include <libpkgsource-exec/libpkgsource-exec.h>
 
 #include "result_identity.h"
 #include "source_archive_backend.h"
@@ -140,6 +141,32 @@ pkgexec::resource_identity resource_identity(
 {
   return pkgexec::resource_identity::from_sha256(
       domain_hash(domain, material));
+}
+
+pkgexec::resource_identity source_object_resource_identity(
+    const pkgfetch::source_materialization& materialization)
+{
+  try {
+    return pkgsource_exec::source_object_tree_identity(materialization);
+  } catch (const pkgsource_exec::error& problem) {
+    throw error(error_code::identity_derivation_failed,
+                "cannot derive source-object resource identity: " +
+                    std::string(problem.what()));
+  }
+}
+
+pkgsource_exec::source_object_tree realize_source_object_resource(
+    const pkgfetch::source_materialization& materialization,
+    const fs::path& destination)
+{
+  try {
+    return pkgsource_exec::realize_source_object_tree(materialization,
+                                                       destination);
+  } catch (const pkgsource_exec::error& problem) {
+    throw error(error_code::source_staging_failed,
+                "cannot realize source-object resource: " +
+                    std::string(problem.what()));
+  }
 }
 
 struct file_stamp final {
@@ -321,78 +348,6 @@ void prepare_writable_child(const fs::path& path, mode_t mode,
       ::fchmod(directory.get(), mode) != 0 || ::fsync(directory.get()) != 0) {
     throw error(error_code::resource_preparation_failed,
                 errno_message("prepare writable resource child", errno));
-  }
-}
-
-void stage_source_object(const pkgfetch::verified_source_object& object,
-                         int destination_directory)
-{
-  unique_fd source(::open(object.object_path().c_str(),
-                          O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
-  if (!source) {
-    throw error(error_code::source_staging_failed,
-                errno_message("open verified source object", errno));
-  }
-  const file_stamp before = fstat_stamp(
-      source.get(), error_code::source_staging_failed,
-      "inspect verified source object");
-  if (!S_ISREG(before.mode)) {
-    throw error(error_code::source_staging_failed,
-                "verified source object is no longer a regular file");
-  }
-  if ((before.mode & 0222U) != 0U) {
-    throw error(error_code::source_staging_failed,
-                "verified source object is writable authority state");
-  }
-
-  unique_fd destination(::openat(
-      destination_directory, object.declaration().local_name().c_str(),
-      O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0400));
-  if (!destination) {
-    throw error(error_code::source_staging_failed,
-                errno_message("create staged source object", errno));
-  }
-
-  sha256_state digest;
-  std::uint64_t bytes = 0;
-  std::array<unsigned char, 65536> buffer{};
-  for (;;) {
-    const ssize_t count = ::read(source.get(), buffer.data(), buffer.size());
-    if (count < 0 && errno == EINTR) {
-      continue;
-    }
-    if (count < 0) {
-      throw error(error_code::source_staging_failed,
-                  errno_message("read verified source object", errno));
-    }
-    if (count == 0) {
-      break;
-    }
-    digest.update(buffer.data(), static_cast<std::size_t>(count));
-    write_all(destination.get(), buffer.data(), static_cast<std::size_t>(count),
-              error_code::source_staging_failed,
-              "write staged source object");
-    bytes += static_cast<std::uint64_t>(count);
-  }
-
-  const file_stamp after = fstat_stamp(
-      source.get(), error_code::source_staging_failed,
-      "reinspect verified source object");
-  if (!(before == after)) {
-    throw error(error_code::source_staging_failed,
-                "verified source object changed during staging");
-  }
-  const std::string observed = digest.finish();
-  if (bytes != object.byte_count() ||
-      observed != object.observed_digest().hex() ||
-      observed != object.declaration().content_digest().hex()) {
-    throw error(error_code::source_staging_failed,
-                "staged source bytes do not match admitted source evidence");
-  }
-  if (::fchmod(destination.get(), 0444) != 0 ||
-      ::fsync(destination.get()) != 0) {
-    throw error(error_code::source_staging_failed,
-                errno_message("seal staged source object", errno));
   }
 }
 
@@ -1538,8 +1493,8 @@ pkgexec::execution_request seal_execution_request(
 
   const auto source_slot = pkgexec::resource_slot::named(
       pkgexec::resource_role::source_tree, "sources");
-  const auto source_identity = resource_identity(
-      "libpkgbuild-exec:source-tree:v1", session.sources().identity().hex());
+  const auto source_identity =
+      source_object_resource_identity(session.sources());
   bindings.emplace_back(source_slot, source_identity,
                         pkgexec::resource_access::read_only,
                         pkgexec::logical_path::parse("/build/source"));
@@ -1608,7 +1563,7 @@ prepared_execution prepare(const admitted_build_session& session)
   auto request = seal_execution_request(session);
 
   reset_directory(session.paths().session_root, 0700);
-  reset_directory(paths.source_tree, 0700);
+  const auto source_tree = realize_source_object_resource(session.sources(), paths.source_tree);
   prepare_writable_directory(
       paths.workspace, 0700, session.identity().user_id,
       session.identity().group_id);
@@ -1622,15 +1577,12 @@ prepared_execution prepare(const admitted_build_session& session)
       paths.workspace / "home", 0700, session.identity().user_id,
       session.identity().group_id);
 
-  unique_fd source_directory(::open(paths.source_tree.c_str(),
+  unique_fd source_directory(::open(source_tree.path.c_str(),
                                      O_RDONLY | O_DIRECTORY | O_CLOEXEC |
                                          O_NOFOLLOW));
   if (!source_directory) {
     throw error(error_code::source_staging_failed,
-                errno_message("open staged source tree", errno));
-  }
-  for (const auto& object : session.sources().objects()) {
-    stage_source_object(object, source_directory.get());
+                errno_message("open realized source-object tree", errno));
   }
   unique_fd workspace_directory(::open(paths.workspace.c_str(),
                                         O_RDONLY | O_DIRECTORY | O_CLOEXEC |
@@ -1662,12 +1614,6 @@ prepared_execution prepare(const admitted_build_session& session)
     throw error(error_code::source_staging_failed,
                 errno_message("synchronize realized source workspace", errno));
   }
-  if (::fsync(source_directory.get()) != 0 ||
-      ::fchmod(source_directory.get(), 0555) != 0) {
-    throw error(error_code::source_staging_failed,
-                errno_message("seal staged source tree", errno));
-  }
-
   std::vector<pkgexec::resource_materialization> materializations;
 
   const auto source_slot = pkgexec::resource_slot::named(

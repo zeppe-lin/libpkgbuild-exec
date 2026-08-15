@@ -1,3 +1,13 @@
+Version: 3.2.0
+Date: 2026-08-15
+
+- Delegate raw verified source-object tree realization to `libpkgsource-exec`;
+  keep archive expansion into the writable build workspace in this adapter.
+- Use the phase-neutral source-resource identity so build and check no longer
+  need separate identities for equivalent admitted raw source materialization.
+- Translate source-resource provider failures back into build-execution error
+  vocabulary instead of leaking provider exceptions across this boundary.
+
 Version: 3.1.0
 Date: 2026-08-15
 

@@ -1,4 +1,4 @@
-# libpkgbuild-exec 3.1.0
+# libpkgbuild-exec 3.2.0
 
 `libpkgbuild-exec` is the native build-execution adapter for Zeppe-Lin.
 It realizes one sealed `libpkgbuild` request through a caller-supplied,
@@ -7,8 +7,9 @@ backend-neutral `libpkgexec` execution authority.
 The adapter combines:
 
 - a sealed build request from `libpkgbuild`;
-- verified raw source objects from `libpkgfetch`, with realization only when
-  `libpkgsource` explicitly declares archive unpacking;
+- exact raw source-object resources from `libpkgsource-exec`, derived from a
+  completed `libpkgfetch` materialization, with build-workspace expansion only
+  when `libpkgsource` explicitly declares archive unpacking;
 - explicit call-scoped host resources for every resolver-issued build and check input;
 - an explicit root view, interpreter identity, credentials, and session paths;
 - an injected `pkgexec::execution_backend`.
@@ -16,14 +17,15 @@ The adapter combines:
 Before any host effect, `seal_execution_request()` can reproduce the exact
 backend-neutral execution request from an admitted session and
 `project_prepared_paths()` can reproduce the adapter-owned source, workspace,
-and temporary paths. `prepare()` uses those same projections, then stages and
-binds host resources. This separation lets restart recovery and downstream
-check composition recover exact request and resource coordinates without
-deleting or recreating a workspace.
+and temporary paths. `prepare()` uses those same projections, asks
+`libpkgsource-exec` to recreate the exact phase-neutral raw source-object tree,
+then realizes and binds the build-owned writable resources. Restart recovery may
+reproduce request authority without destructive preparation, while a later
+check can recreate equivalent source authority independently from retained
+materialization evidence.
 
-The effectful path stages each verified source again under its exact declared
-`local_name`, requests denied-network execution, retains the complete execution
-result, inspects the package output root, and writes an uncompressed
+The effectful path requests denied-network execution, retains the complete
+execution result, inspects the package output root, and writes an uncompressed
 `package_tar`. `execute_sealed()` keeps the exact read-only archive beneath the
 admitted private session root, asks `libpkgimage` to inspect those sealed bytes,
 and delegates build/image equality to `libpkgbuild-image` before build success

@@ -3,7 +3,7 @@
 project(
   'libpkgbuild-exec',
   'cpp',
-  version: '3.1.0',
+  version: '3.2.0',
   license: 'GPL-3.0-or-later',
   meson_version: '>=1.2.0',
   default_options: [
@@ -31,6 +31,12 @@ libcrypto_dep = dependency(
 )
 libarchive_dep = dependency(
   'libarchive',
+  required: true,
+  static: want_static,
+)
+libpkgsource_exec_dep = dependency(
+  'libpkgsource-exec',
+  version: ['>=0.1.0', '<1.0.0'],
   required: true,
   static: want_static,
 )

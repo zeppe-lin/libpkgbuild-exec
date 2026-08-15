@@ -84,10 +84,11 @@ selection belongs to orchestration; the fixture backend returns real sealed
   workspace, package-output, or temporary resource. That refusal occurs before
   effectful preparation begins.
 
-`preparation` proves exact verified source bytes are reopened, rehashed, staged
-under their declared local names, sealed read-only, and bound together with the
-exact writable workspace/output/temporary resources. Changed bytes and a final
-source-object symlink are refused.
+`preparation` proves the exact retained materialization is recreated through
+`libpkgsource-exec` as a read-only raw source-object resource, then bound together
+with the exact writable workspace/output/temporary resources. Provider failures
+are translated back into `libpkgbuild-exec` source-staging vocabulary. Archive
+expansion, when declared, occurs only in the writable build workspace.
 
 `backend-contract` proves capability observation and execution are both
 exception-contained. Returned execution evidence must name the exact projected
