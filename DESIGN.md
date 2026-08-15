@@ -80,10 +80,12 @@ without invoking destructive workspace preparation.
 
 Raw source-object realization is delegated to `libpkgsource-exec`. That provider
 reopens and rehashes the exact `pkgfetch::source_materialization`, exposes each
-object under its declared `local_name`, seals the tree read-only, and derives one
-phase-neutral resource identity from materialization authority. Build therefore
-uses the same raw-source resource semantics that another execution phase may
-recreate without borrowing this adapter's private staging implementation.
+object under its declared `local_name`, and seals the tree read-only. It does not
+mint `pkgexec::resource_identity`. This adapter owns the concrete build execution
+resource instance and derives its identity from the exact build request plus
+materialization authority. Another execution phase may therefore recreate the
+same raw-source semantics without borrowing either this adapter's private staging
+layout or its execution-resource identity.
 
 A source whose sealed `unpack_kind()` is `archive` is additionally decoded by
 this adapter's private source-archive backend into the writable build workspace

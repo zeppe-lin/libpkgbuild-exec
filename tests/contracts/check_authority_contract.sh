@@ -38,8 +38,10 @@ grep -q 'pkgbuild::image_adapter::build_image_authority' "$api"
 
 # Raw source-object realization is delegated to the phase-neutral provider.
 grep -q '#include <libpkgsource-exec/libpkgsource-exec.h>' "$executor"
-grep -q 'pkgsource_exec::source_object_tree_identity(materialization)' "$executor"
+grep -q 'libpkgbuild-exec:source-object-resource:v1' "$executor"
+! grep -q 'pkgsource_exec::source_object_tree_identity' "$executor"
 grep -q 'pkgsource_exec::realize_source_object_tree(materialization' "$executor"
+grep -q 'source_tree.materialization != session.sources().identity()' "$executor"
 grep -q 'cannot realize source-object resource:' "$executor"
 ! grep -q 'stage_source_object(' "$executor"
 

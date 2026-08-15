@@ -144,15 +144,11 @@ pkgexec::resource_identity resource_identity(
 }
 
 pkgexec::resource_identity source_object_resource_identity(
-    const pkgfetch::source_materialization& materialization)
+    const admitted_build_session& session)
 {
-  try {
-    return pkgsource_exec::source_object_tree_identity(materialization);
-  } catch (const pkgsource_exec::error& problem) {
-    throw error(error_code::identity_derivation_failed,
-                "cannot derive source-object resource identity: " +
-                    std::string(problem.what()));
-  }
+  return resource_identity(
+      "libpkgbuild-exec:source-object-resource:v1",
+      session.request().identity().hex() + session.sources().identity().hex());
 }
 
 pkgsource_exec::source_object_tree realize_source_object_resource(
@@ -1494,7 +1490,7 @@ pkgexec::execution_request seal_execution_request(
   const auto source_slot = pkgexec::resource_slot::named(
       pkgexec::resource_role::source_tree, "sources");
   const auto source_identity =
-      source_object_resource_identity(session.sources());
+      source_object_resource_identity(session);
   bindings.emplace_back(source_slot, source_identity,
                         pkgexec::resource_access::read_only,
                         pkgexec::logical_path::parse("/build/source"));
@@ -1563,7 +1559,14 @@ prepared_execution prepare(const admitted_build_session& session)
   auto request = seal_execution_request(session);
 
   reset_directory(session.paths().session_root, 0700);
-  const auto source_tree = realize_source_object_resource(session.sources(), paths.source_tree);
+  const auto source_tree = realize_source_object_resource(
+      session.sources(), paths.source_tree);
+  if (source_tree.source != session.request().source().identity() ||
+      source_tree.materialization != session.sources().identity() ||
+      source_tree.path != paths.source_tree) {
+    throw error(error_code::source_staging_failed,
+                "source-object realization differs from admitted build authority");
+  }
   prepare_writable_directory(
       paths.workspace, 0700, session.identity().user_id,
       session.identity().group_id);
