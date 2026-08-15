@@ -74,9 +74,13 @@ inline pkgsource::source_snapshot source_snapshot(
                   requirement_subject(package_reference("tool")),
                   at("requirements.build[0]", 12)),
               requirement_declaration(
+                  requirement_scope::build(),
+                  requirement_subject(package_reference("helper")),
+                  at("requirements.build[1]", 13)),
+              requirement_declaration(
                   requirement_scope::check(),
                   requirement_subject(package_reference("checker")),
-                  at("requirements.check[0]", 14)),
+                  at("requirements.check[0]", 15)),
           },
           {},
           architecture_requirements(
@@ -136,6 +140,7 @@ inline pkgresolve::resolution_result resolution(
   std::vector<pkgsource::source_snapshot> sources;
   sources.push_back(source_snapshot(first_digest, second_digest));
   sources.push_back(dependency_source("tool"));
+  sources.push_back(dependency_source("helper"));
   sources.push_back(dependency_source("checker"));
 
   pkgcatalog::collection_declaration declaration(

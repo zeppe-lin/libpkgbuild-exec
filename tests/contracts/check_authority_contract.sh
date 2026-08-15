@@ -23,7 +23,7 @@ if grep -E -n 'input-tree identity|Package-input tree identities|materialized tr
 fi
 grep -q 'pkgexec::execution_backend' "$executor_api"
 grep -q 'seal_execution_request' "$executor_api"
-grep -q 'distinct logical package inputs share one execution resource identity' "$root/src/model.cpp"
+grep -q 'distinct build-scoped package inputs share one execution resource identity' "$root/src/model.cpp"
 grep -q 'require_unique_execution_resource_identities' "$executor"
 grep -q 'const auto advertised_backend = backend_capabilities(backend);' "$executor"
 grep -q 'execution.backend() != advertised_backend' "$executor"
@@ -49,7 +49,20 @@ grep -q 'cannot realize source-object resource:' "$executor"
 grep -q 'network_policy::denied' "$executor"
 grep -q 'resource_role::source_tree' "$executor"
 grep -q 'resource_role::build_input_tree' "$executor"
-grep -q 'resource_role::check_input_tree' "$executor"
+! grep -q 'resource_role::check_input_tree' "$executor" || {
+  echo 'check-scoped package resources leaked into construction execution' >&2
+  exit 1
+}
+grep -q 'for_scope(' "$executor"
+grep -q 'pkgbuild::input_scope::build' "$executor"
+! grep -q 'PKG_CHECK_INPUT_ROOT' "$executor" || {
+  echo 'check input root leaked into construction environment' >&2
+  exit 1
+}
+! grep -q 'PKG_CHECK_INPUTS' "$executor" || {
+  echo 'check input list leaked into construction environment' >&2
+  exit 1
+}
 grep -q 'resource_role::package_output_root' "$executor"
 grep -q '^prepared_paths project_prepared_paths(' "$executor"
 grep -q '^pkgexec::execution_request seal_execution_request(' "$executor"

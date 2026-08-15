@@ -30,7 +30,9 @@ Locators, cache paths, package-input host paths, session directories, and the
 artifact destination are effect coordinates. They do not enter native build
 identity. The caller supplies one exact root view, interpreter identity,
 numeric credential policy, and one explicit call-scoped resource identity and
-host path for every logical package input retained by the sealed request.
+host path for every build-scoped logical package input retained by the sealed
+request. Check-scoped inputs remain logical authority only and are realized by
+the independent check execution boundary.
 
 The adapter depends only on the backend-neutral `pkgexec::execution_backend`.
 Backend construction and `libpkgexec-linux` selection belong to orchestration.
@@ -41,8 +43,11 @@ A session is admitted only when:
 
 - the fetch materialization belongs to the request's exact source snapshot;
 - every sealed source occurs exactly once with the required SHA-256;
-- every logical build or check input has exactly one matching
+- every logical build-scoped input has exactly one matching
   `package_input_resource` bound by its `pkgbuild::build_input_identity`;
+- check-scoped inputs remain part of the sealed `pkgbuild::build_request` but
+  have no concrete construction resource and cannot be supplied to this
+  adapter;
 - no resource is duplicated, aliased to another logical input, or supplied for
   an input absent from the request;
 - root, session, package-output, artifact, and package-input coordinates are

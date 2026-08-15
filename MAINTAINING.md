@@ -65,3 +65,11 @@ x86-64 qualification proves those retained carriers and every containing
 generations require the same explicit layout review before widening the accepted
 dependency interval. Shared qualification must prove a direct
 `libpkgexec.so.2` NEEDED edge and refuse obsolete exec generations.
+
+## Input-scope discipline
+
+`pkgbuild::build_request` retains both build- and check-scoped logical inputs,
+but this adapter concretizes only `pkgbuild::input_scope::build`. Do not add
+`PKG_CHECK_INPUT_ROOT`, `PKG_CHECK_INPUTS`, `check_input_tree` bindings, or
+check-scoped `package_input_resource` admission here. Concrete check inputs
+belong to the independent check execution composition.

@@ -13,6 +13,30 @@ namespace {
 
 using namespace pkgbuild_exec_test;
 
+bool has_environment_variable(
+    const pkgexec::environment_policy& environment,
+    std::string_view name)
+{
+  return std::any_of(
+      environment.additional_variables().begin(),
+      environment.additional_variables().end(),
+      [&](const pkgexec::environment_variable& value) {
+        return value.name() == name;
+      });
+}
+
+std::string expected_build_input_names(const pkgbuild::build_request& request)
+{
+  std::string value;
+  for (const auto& input :
+       request.inputs().for_scope(pkgbuild::input_scope::build)) {
+    if (!value.empty())
+      value.push_back(':');
+    value += input.package().name();
+  }
+  return value;
+}
+
 void require_exact_guarantees(const pkgexec::execution_request& request)
 {
   std::vector<pkgexec::execution_guarantee> expected{
@@ -69,11 +93,13 @@ void projects_exact_build_contract()
               environment_value(request.environment(), "PKG_DESTDIR") ==
                   "/build/package" &&
               environment_value(request.environment(), "PKG_BUILD_INPUTS") ==
-                  "tool" &&
-              environment_value(request.environment(), "PKG_CHECK_INPUTS") ==
-                  "checker" &&
+                  expected_build_input_names(owner.get().request) &&
+              !has_environment_variable(request.environment(),
+                                        "PKG_CHECK_INPUT_ROOT") &&
+              !has_environment_variable(request.environment(),
+                                        "PKG_CHECK_INPUTS") &&
               environment_value(request.environment(), "PKG_JOBS") == "4",
-          "build environment projection changed");
+          "build environment projection changed or leaked check inputs");
   require(request.credentials().user_id() == ::getuid() &&
               request.credentials().group_id() == ::getgid() &&
               request.credentials().no_new_privileges(),
@@ -88,8 +114,6 @@ void projects_exact_build_contract()
       pkgexec::resource_role::source_tree, "sources"));
   const auto& build = request.resources().binding(pkgexec::resource_slot::named(
       pkgexec::resource_role::build_input_tree, "tool"));
-  const auto& check = request.resources().binding(pkgexec::resource_slot::named(
-      pkgexec::resource_role::check_input_tree, "checker"));
   const auto& workspace = request.resources().binding(
       pkgexec::resource_slot::singleton(pkgexec::resource_role::build_workspace));
   const auto& output = request.resources().binding(
@@ -99,12 +123,19 @@ void projects_exact_build_contract()
       pkgexec::resource_slot::singleton(
           pkgexec::resource_role::private_temporary_root));
 
+  require(std::none_of(
+              request.resources().bindings().begin(),
+              request.resources().bindings().end(),
+              [](const pkgexec::resource_binding& binding) {
+                return binding.slot().role() ==
+                    pkgexec::resource_role::check_input_tree;
+              }),
+          "construction request leaked a check-input resource binding");
+
   require(source.access() == pkgexec::resource_access::read_only &&
               source.mount_point().string() == "/build/source" &&
               build.access() == pkgexec::resource_access::read_only &&
               build.mount_point().string() == "/build/inputs/build/tool" &&
-              check.access() == pkgexec::resource_access::read_only &&
-              check.mount_point().string() == "/build/inputs/check/checker" &&
               workspace.access() == pkgexec::resource_access::writable &&
               workspace.mount_point().string() == "/build/work" &&
               output.access() == pkgexec::resource_access::writable &&
@@ -126,7 +157,7 @@ void host_effect_paths_do_not_change_request_authority()
 
   const fs::path alternate = owner.get().root / "alternate-inputs";
   fs::create_directories(alternate / "tool");
-  fs::create_directories(alternate / "checker");
+  fs::create_directories(alternate / "helper");
   auto relocated = pkgbuild_exec::admitted_build_session::admit(
       owner.get().request, owner.get().materialization,
       owner.get().package_inputs(alternate), owner.get().paths("relocated"),

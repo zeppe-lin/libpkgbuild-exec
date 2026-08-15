@@ -10,7 +10,9 @@ The adapter combines:
 - exact raw source-object resources from `libpkgsource-exec`, derived from a
   completed `libpkgfetch` materialization, with build-workspace expansion only
   when `libpkgsource` explicitly declares archive unpacking;
-- explicit call-scoped host resources for every resolver-issued build and check input;
+- explicit call-scoped host resources for resolver-issued build inputs only;
+  check-scoped inputs remain sealed logical request authority for the independent
+  check phase and are never mounted into construction;
 - an explicit root view, interpreter identity, credentials, and session paths;
 - an injected `pkgexec::execution_backend`.
 

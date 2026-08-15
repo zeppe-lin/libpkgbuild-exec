@@ -109,10 +109,12 @@ public:
     fs::create_directories(root / "store");
     fs::create_directories(root / "root");
     fs::create_directories(root / "inputs/tool");
+    fs::create_directories(root / "inputs/helper");
     fs::create_directories(root / "inputs/checker");
     write_file(root / "local/payload", payload_bytes);
     write_file(root / "local/archive.tar", archive_bytes);
     write_file(root / "inputs/tool/tool", "tool tree\n", 0555);
+    write_file(root / "inputs/helper/helper", "helper tree\n", 0555);
     write_file(root / "inputs/checker/checker", "checker tree\n", 0555);
 
     auto resolved = resolution(sha256_text(payload_bytes),
@@ -150,9 +152,10 @@ public:
     {
       const fs::path resource_root = base.empty() ? root / "inputs" : base;
       std::vector<pkgbuild_exec::package_input_resource> resources;
-      for (const auto& input : request.inputs().inputs()) {
-        const char seed =
-            input.scope() == pkgbuild::input_scope::build ? 'c' : 'd';
+      std::size_t index = 0;
+      for (const auto& input :
+           request.inputs().for_scope(pkgbuild::input_scope::build)) {
+        const char seed = static_cast<char>('c' + index++);
         resources.push_back({
             input.identity(),
             pkgexec::resource_identity::from_sha256(std::string(64U, seed)),

@@ -8,6 +8,10 @@ Date: 2026-08-15
   identity is therefore owned here rather than exported by libpkgsource-exec.
 - Translate source-resource provider failures back into build-execution error
   vocabulary instead of leaking provider exceptions across this boundary.
+- Restrict concrete construction package inputs to build scope. Check-scoped
+  requirements remain sealed in the build request but are not mounted or
+  exported through the build execution environment; independent check
+  execution owns their concrete realization.
 
 Version: 3.1.0
 Date: 2026-08-15

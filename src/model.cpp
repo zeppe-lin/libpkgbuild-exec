@@ -162,15 +162,18 @@ admitted_build_session admitted_build_session::admit(
     }
   }
 
-  if (package_inputs.size() != request.inputs().inputs().size()) {
-    throw error(error_code::package_input_mismatch,
-                "package-input resource cardinality differs from the build request");
+  const auto build_inputs =
+      request.inputs().for_scope(pkgbuild::input_scope::build);
+  if (package_inputs.size() != build_inputs.size()) {
+    throw error(
+        error_code::package_input_mismatch,
+        "package-input resource cardinality differs from build-scoped inputs");
   }
 
   std::vector<package_input_resource> normalized_inputs;
-  normalized_inputs.reserve(request.inputs().inputs().size());
+  normalized_inputs.reserve(build_inputs.size());
   std::vector<bool> consumed(package_inputs.size(), false);
-  for (const auto& expected : request.inputs().inputs()) {
+  for (const auto& expected : build_inputs) {
     std::optional<std::size_t> match;
     for (std::size_t index = 0; index < package_inputs.size(); ++index) {
       const auto& supplied = package_inputs[index];
@@ -184,7 +187,7 @@ admitted_build_session admitted_build_session::admit(
     }
     if (!match) {
       throw error(error_code::package_input_mismatch,
-                  "a logical package input lacks its concrete host resource");
+                  "a build-scoped package input lacks its concrete host resource");
     }
     consumed[*match] = true;
     auto supplied = package_inputs[*match];
@@ -192,8 +195,9 @@ admitted_build_session admitted_build_session::admit(
     normalized_inputs.push_back(std::move(supplied));
   }
   if (std::find(consumed.begin(), consumed.end(), false) != consumed.end()) {
-    throw error(error_code::package_input_mismatch,
-                "an extra package-input resource is not present in the build request");
+    throw error(
+        error_code::package_input_mismatch,
+        "an extra package-input resource is not a build-scoped request input");
   }
 
   std::set<pkgexec::resource_identity> input_resources;
@@ -201,7 +205,7 @@ admitted_build_session admitted_build_session::admit(
     if (!input_resources.insert(input.resource).second) {
       throw error(
           error_code::package_input_mismatch,
-          "distinct logical package inputs share one execution resource identity");
+          "distinct build-scoped package inputs share one execution resource identity");
     }
   }
 

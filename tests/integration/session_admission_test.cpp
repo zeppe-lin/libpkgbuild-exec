@@ -39,13 +39,14 @@ void canonicalizes_input_order()
   auto session = admit(owner.get(), std::move(inputs), owner.get().paths(),
                        owner.get().execution_identity(),
                        owner.get().materialization);
-  require(session.package_inputs().size() ==
-              owner.get().request.inputs().inputs().size(),
-          "admission changed package-input cardinality");
+  const auto build_inputs = owner.get().request.inputs().for_scope(
+      pkgbuild::input_scope::build);
+  require(session.package_inputs().size() == build_inputs.size(),
+          "admission changed build-scoped package-input cardinality");
   for (std::size_t index = 0; index < session.package_inputs().size(); ++index) {
     require(session.package_inputs()[index].input ==
-                owner.get().request.inputs().inputs()[index].identity(),
-            "package-input resources were not normalized to request order");
+                build_inputs[index].identity(),
+            "package-input resources were not normalized to build-scope order");
   }
 }
 
@@ -81,6 +82,22 @@ void rejects_input_set_mismatch()
   aliased[1].resource = aliased[0].resource;
   expect_error(pkgbuild_exec::error_code::package_input_mismatch, [&] {
     (void)admit(owner.get(), aliased, owner.get().paths("alias"),
+                owner.get().execution_identity(), owner.get().materialization);
+  });
+
+  auto with_check_input = owner.get().package_inputs();
+  const auto check_inputs = owner.get().request.inputs().for_scope(
+      pkgbuild::input_scope::check);
+  require(check_inputs.size() == 1U,
+          "fixture must retain one logical check-scoped input");
+  with_check_input.push_back({
+      check_inputs.front().identity(),
+      pkgexec::resource_identity::from_sha256(std::string(64U, 'f')),
+      owner.get().root / "inputs/checker",
+  });
+  expect_error(pkgbuild_exec::error_code::package_input_mismatch, [&] {
+    (void)admit(owner.get(), with_check_input,
+                owner.get().paths("check-scope-leak"),
                 owner.get().execution_identity(), owner.get().materialization);
   });
 }

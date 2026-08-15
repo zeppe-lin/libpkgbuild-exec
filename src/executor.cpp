@@ -375,11 +375,8 @@ pkgexec::environment_policy execution_environment(
   variables.emplace_back("PKG_BUILD_ROOT", "/build/work");
   variables.emplace_back("PKG_DESTDIR", "/build/package");
   variables.emplace_back("PKG_BUILD_INPUT_ROOT", "/build/inputs/build");
-  variables.emplace_back("PKG_CHECK_INPUT_ROOT", "/build/inputs/check");
   variables.emplace_back("PKG_BUILD_INPUTS",
                          join_input_names(request, pkgbuild::input_scope::build));
-  variables.emplace_back("PKG_CHECK_INPUTS",
-                         join_input_names(request, pkgbuild::input_scope::check));
   variables.emplace_back("PKG_BUILD_ARCH",
                          request.architectures().build().name());
   variables.emplace_back("PKG_TARGET_ARCH",
@@ -1495,22 +1492,15 @@ pkgexec::execution_request seal_execution_request(
                         pkgexec::resource_access::read_only,
                         pkgexec::logical_path::parse("/build/source"));
 
-  for (const auto& expected : session.request().inputs().inputs()) {
+  for (const auto& expected : session.request().inputs().for_scope(
+           pkgbuild::input_scope::build)) {
     const auto& supplied = supplied_resource(session, expected);
-    const auto role =
-        expected.scope() == pkgbuild::input_scope::build
-            ? pkgexec::resource_role::build_input_tree
-            : pkgexec::resource_role::check_input_tree;
     const std::string name = package_input_name(expected);
-    const auto slot = pkgexec::resource_slot::named(role, name);
-    const std::string mount =
-        std::string("/build/inputs/") +
-        (role == pkgexec::resource_role::build_input_tree ? "build/" :
-                                                            "check/") +
-        name;
-    bindings.emplace_back(slot, supplied.resource,
-                          pkgexec::resource_access::read_only,
-                          pkgexec::logical_path::parse(mount));
+    const auto slot = pkgexec::resource_slot::named(
+        pkgexec::resource_role::build_input_tree, name);
+    bindings.emplace_back(
+        slot, supplied.resource, pkgexec::resource_access::read_only,
+        pkgexec::logical_path::parse("/build/inputs/build/" + name));
   }
 
   const auto workspace_slot = pkgexec::resource_slot::singleton(
@@ -1624,7 +1614,8 @@ prepared_execution prepare(const admitted_build_session& session)
   materializations.emplace_back(
       request.resources().binding(source_slot).resource(), paths.source_tree);
 
-  for (const auto& expected : session.request().inputs().inputs()) {
+  for (const auto& expected : session.request().inputs().for_scope(
+           pkgbuild::input_scope::build)) {
     const auto& supplied = supplied_resource(session, expected);
     materializations.emplace_back(supplied.resource, supplied.path);
   }
