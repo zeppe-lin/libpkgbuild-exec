@@ -827,7 +827,7 @@ public:
     if (!path_.empty()) {
       (void)::unlink(path_.c_str());
     }
-    if (!published_.empty()) {
+    if (!published_.empty() && owns_publication_) {
       struct stat descriptor_info {};
       struct stat path_info {};
       if (::fstat(descriptor_.get(), &descriptor_info) == 0 &&
@@ -845,9 +845,15 @@ public:
   [[nodiscard]] int descriptor() const noexcept { return descriptor_.get(); }
   [[nodiscard]] const fs::path& path() const noexcept { return path_; }
 
-  void publish(const fs::path& destination)
+  void publish(
+      const fs::path& destination,
+      const std::pair<std::string, std::uint64_t>& expected)
   {
     if (::link(path_.c_str(), destination.c_str()) != 0) {
+      if (errno == EEXIST) {
+        adopt_exact_existing(destination, expected);
+        return;
+      }
       throw error(error_code::artifact_publication_failed,
                   errno_message("publish artifact without replacement", errno));
     }
@@ -897,6 +903,7 @@ public:
     }
     path_.clear();
     published_ = destination;
+    owns_publication_ = true;
   }
 
   void verify_published_binding() const
@@ -926,6 +933,10 @@ public:
     if (published_.empty()) {
       return;
     }
+    if (!owns_publication_) {
+      published_.clear();
+      return;
+    }
     struct stat descriptor_info {};
     struct stat path_info {};
     if (::fstat(descriptor_.get(), &descriptor_info) != 0 ||
@@ -948,12 +959,82 @@ public:
     published_.clear();
   }
 
-  void retain() noexcept { published_.clear(); }
+  void retain() noexcept
+  {
+    published_.clear();
+    owns_publication_ = false;
+  }
 
 private:
+  void adopt_exact_existing(
+      const fs::path& destination,
+      const std::pair<std::string, std::uint64_t>& expected)
+  {
+    unique_fd existing(::open(
+        destination.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+    if (!existing) {
+      throw error(
+          error_code::artifact_publication_failed,
+          errno_message("open existing artifact publication", errno));
+    }
+    const file_stamp before = fstat_stamp(
+        existing.get(), error_code::artifact_publication_failed,
+        "inspect existing artifact publication");
+    if (!S_ISREG(before.mode) || (before.mode & 0222U) != 0U) {
+      throw error(
+          error_code::artifact_publication_failed,
+          "existing artifact publication is not a read-only regular file");
+    }
+    const auto observed = hash_regular(
+        existing.get(), before, error_code::artifact_publication_failed);
+    if (observed != expected) {
+      throw error(
+          error_code::artifact_publication_failed,
+          "existing artifact publication differs from freshly sealed bytes");
+    }
+
+    struct stat path_info {};
+    if (::lstat(destination.c_str(), &path_info) != 0) {
+      throw error(
+          error_code::artifact_publication_failed,
+          errno_message("reinspect existing artifact publication", errno));
+    }
+    const file_stamp path_stamp = stamp_of(path_info);
+    if (!(before == path_stamp)) {
+      throw error(
+          error_code::artifact_publication_failed,
+          "existing artifact publication changed during exact verification");
+    }
+
+    unique_fd parent(::open(
+        destination.parent_path().c_str(),
+        O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW));
+    if (!parent) {
+      throw error(
+          error_code::artifact_cleanup_failed,
+          errno_message("open artifact parent after exact publication", errno));
+    }
+    if (::unlink(path_.c_str()) != 0) {
+      throw error(
+          error_code::artifact_cleanup_failed,
+          errno_message("remove redundant temporary artifact", errno));
+    }
+    path_.clear();
+    if (::fsync(parent.get()) != 0) {
+      throw error(
+          error_code::artifact_cleanup_failed,
+          errno_message("synchronize redundant artifact cleanup", errno));
+    }
+
+    descriptor_ = std::move(existing);
+    published_ = destination;
+    owns_publication_ = false;
+  }
+
   unique_fd descriptor_;
   fs::path path_;
   fs::path published_;
+  bool owns_publication_ = false;
 };
 
 unique_fd open_regular_beneath(
@@ -1527,7 +1608,7 @@ build_execution_result execute(const admitted_build_session& session,
     }
     const auto artifact_digest = hash_artifact(temporary.descriptor());
 
-    temporary.publish(session.paths().artifact_path);
+    temporary.publish(session.paths().artifact_path, artifact_digest);
 
     try {
       pkgimage::libarchive_backend image_backend;

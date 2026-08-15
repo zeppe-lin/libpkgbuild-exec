@@ -1,4 +1,8 @@
-Version: 3.0.0
+Version: 3.0.1
+
+- Treat an already-published artifact as an idempotent publication only when a
+  fresh authorized execution seals exactly the same read-only bytes; differing
+  pre-existing bytes still fail without replacement.
 Date: 2026-08-14
 
 - Rebuild `admitted_build_session` against `libpkgfetch.so.3` and advance the

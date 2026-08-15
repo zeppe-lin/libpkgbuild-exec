@@ -63,6 +63,31 @@ void publication_is_non_replacing()
           "publication conflict retained successful image authority");
 }
 
+
+void exact_publication_is_idempotent()
+{
+  fixture_owner owner("publication-idempotent");
+  fixture_backend backend(backend_mode::succeed);
+  const auto session = owner.get().session();
+  const fs::path destination = session.paths().artifact_path;
+  const auto first = pkgbuild_exec::execute(session, backend);
+  require(first.build().outcome() == pkgbuild::build_outcome::succeeded &&
+              first.build().artifact() && first.image_authority(),
+          "initial exact-publication fixture build failed");
+  const auto retained_bytes = read_file(destination);
+  const auto retained_artifact = first.build().artifact()->identity();
+
+  fs::remove_all(session.paths().package_output_root);
+  const auto replay = pkgbuild_exec::execute(session, backend);
+  require(replay.build().outcome() == pkgbuild::build_outcome::succeeded &&
+              replay.build().artifact() && replay.image_authority(),
+          "exact pre-existing publication was not accepted by fresh replay");
+  require(replay.build().artifact()->identity() == retained_artifact,
+          "exact replay changed sealed artifact identity");
+  require(read_file(destination) == retained_bytes,
+          "exact replay replaced retained artifact bytes");
+}
+
 void large_payload_is_descriptor_bounded()
 {
   fixture_owner owner("large-payload");
@@ -111,6 +136,7 @@ int main()
 {
   try {
     publication_is_non_replacing();
+    exact_publication_is_idempotent();
     large_payload_is_descriptor_bounded();
     unsupported_output_object_fails_payload_inspection();
     empty_output_fails_payload_inspection();

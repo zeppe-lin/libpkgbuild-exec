@@ -22,7 +22,7 @@ require_dependency_range()
   printf '%s\n' "$block" | grep -F "  version: $range," >/dev/null ||
     fail "$variable does not require $range"
 }
-require "$root/meson.build" "  version: '3.0.0',"
+require "$root/meson.build" "  version: '3.0.1',"
 require_dependency_range libpkgsource_dep libpkgsource "['>=4.0.0', '<5.0.0']"
 require_dependency_range libpkgbuild_dep libpkgbuild "['>=3.0.1', '<4.0.0']"
 require_dependency_range libpkgbuild_image_dep libpkgbuild-image "['>=1.0.1', '<2.0.0']"
@@ -52,8 +52,8 @@ check_dependency_list private_deps \
 require "$root/src/meson.build" "  soversion: '3',"
 require "$root/src/meson.build" '  requires: public_deps,'
 require "$root/src/meson.build" '  requires_private: private_deps,'
-require "$root/HISTORY.md" 'Version: 3.0.0'
+require "$root/HISTORY.md" 'Version: 3.0.1'
 require "$root/HISTORY.md" 'Version: 2.3.0'
 require "$root/HISTORY.md" 'Version: 2.2.0'
 require "$root/HISTORY.md" 'libpkgexec 2.x'
-require "$root/README.md" '# libpkgbuild-exec 3.0.0'
+require "$root/README.md" '# libpkgbuild-exec 3.0.1'
