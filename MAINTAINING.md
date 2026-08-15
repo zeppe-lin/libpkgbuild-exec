@@ -27,10 +27,17 @@ identity strings. Decoder code must remain free of host paths and effects.
 ## ABI release gate
 
 `libpkgbuild-exec` 3.x is the source-4/fetch-3 retaining ABI generation. The
-shared ELF surface remains the reviewed 28-symbol
+shared ELF surface is the reviewed 31-symbol
 `abi/libpkgbuild-exec.exports` manifest. GCC and Clang shared builds must match
 that manifest exactly. Private constructors, `detail` implementation helpers,
 and standard-library implementation symbols are not compatibility surface.
+
+The 3.1 API adds only free-function projections/execution phases; it changes no
+public carrier layout or virtual protocol, so the SONAME remains 3. Durable
+controllers should persist successful `build_execution_result` evidence after
+`execute_sealed()` and before `publish_sealed_artifact()`. Moving POSIX
+publication logic into a controller instead of this adapter is an authority
+regression.
 
 A dependency SONAME change is not by itself a reason to advance this library's
 SONAME. Advance the provider ABI only when a public `libpkgbuild-exec` signature,

@@ -24,11 +24,17 @@ complete output capture, and denied networking. The caller selects and owns
 the execution backend and the exact root view.
 
 After successful execution, the complete package output root is inspected
-without following symlinks. Version 0.1 encodes an uncompressed
-package-tar artifact, publishes it without replacing an existing name, and
-asks *libpkgimage* to inspect the published bytes with their expected complete
-SHA-256. Build success is sealed only when the normalized archive image equals
-the intended payload manifest.
+without following symlinks. The adapter encodes an uncompressed package-tar
+artifact beneath the admitted private session root and asks *libpkgimage* to
+inspect those sealed bytes with their expected complete SHA-256. Build success
+is retained only when the normalized archive image equals the intended payload
+manifest.
+
+*execute_sealed()* stops at that private durable boundary.
+*publish_sealed_artifact()* later projects the exact retained bytes to the
+caller artifact path without replacement. This permits terminal construction
+evidence to become durable before public publication. The convenience
+*execute()* performs both phases for one-shot callers.
 
 # DURABLE EVIDENCE
 

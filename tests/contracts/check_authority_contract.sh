@@ -29,6 +29,9 @@ grep -q 'const auto advertised_backend = backend_capabilities(backend);' "$execu
 grep -q 'execution.backend() != advertised_backend' "$executor"
 grep -q 'execution backend threw non-standard execution evidence' "$executor"
 grep -q 'project_prepared_paths' "$executor_api"
+grep -q 'project_sealed_artifact_path' "$executor_api"
+grep -q 'execute_sealed' "$executor_api"
+grep -q 'publish_sealed_artifact' "$executor_api"
 grep -q 'without touching host resources' "$executor_api"
 grep -q 'pkgbuild::image_adapter::build_image_authority' "$api"
 ! grep -R -q 'libpkgexec-linux' "$root/include" "$root/src" "$meson"
@@ -57,9 +60,15 @@ test "$request_line" -lt "$reset_line" || {
   exit 1
 }
 
-# Artifact production is non-replacing and independently inspected.
+# Artifact production is privately sealed before caller-visible publication.
 grep -q 'archive_write_set_format_pax_restricted' "$executor"
 grep -q '::link(path_.c_str(), destination.c_str())' "$executor"
+grep -q '^fs::path project_sealed_artifact_path(' "$executor"
+grep -q '^build_execution_result execute_sealed(' "$executor"
+grep -q '^void publish_sealed_artifact(' "$executor"
+grep -q 'const auto sealed_path = project_sealed_artifact_path(session);' "$executor"
+grep -q 'open_exact_read_only_artifact' "$executor"
+grep -q 'copy_exact_artifact' "$executor"
 grep -q 'image_digest(artifact_digest.first)' "$executor"
 grep -q 'verify_published_binding' "$executor"
 grep -q 'build_image_authority::admit' "$executor"
@@ -67,6 +76,12 @@ grep -q 'build_image_authority::admit' "$executor"
 grep -q 'open_regular_beneath' "$executor"
 grep -q 'package payload changed during archive encoding' "$executor"
 grep -q 'large_payload_is_descriptor_bounded' \
+  "$root/tests/integration/result_sealing_test.cpp"
+grep -q 'sealed_execution_defers_publication' \
+  "$root/tests/integration/result_sealing_test.cpp"
+grep -q 'retained_result_publication_is_idempotent' \
+  "$root/tests/integration/result_sealing_test.cpp"
+grep -q 'retained_result_refuses_different_publication' \
   "$root/tests/integration/result_sealing_test.cpp"
 ! grep -q 'unique_fd descriptor;' "$executor" || {
   echo 'payload sealing retains one descriptor per regular file' >&2

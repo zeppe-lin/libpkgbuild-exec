@@ -3,7 +3,7 @@
 project(
   'libpkgbuild-exec',
   'cpp',
-  version: '3.0.1',
+  version: '3.1.0',
   license: 'GPL-3.0-or-later',
   meson_version: '>=1.2.0',
   default_options: [

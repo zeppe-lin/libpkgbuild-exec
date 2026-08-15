@@ -6,9 +6,9 @@ root=${1:?}
 fail() { echo "abi-contract: $*" >&2; exit 1; }
 manifest=$root/abi/libpkgbuild-exec.exports
 [ -s "$manifest" ] || fail 'reviewed ELF ABI manifest is absent'
-[ "$(sed -n '/^_Z[A-Za-z0-9_]*$/p' "$manifest" | wc -l)" -eq 28 ] ||
-  fail 'reviewed ELF ABI manifest must contain exactly 28 symbols'
-[ "$(LC_ALL=C sort -u "$manifest" | wc -l)" -eq 28 ] ||
+[ "$(sed -n '/^_Z[A-Za-z0-9_]*$/p' "$manifest" | wc -l)" -eq 31 ] ||
+  fail 'reviewed ELF ABI manifest must contain exactly 31 symbols'
+[ "$(LC_ALL=C sort -u "$manifest" | wc -l)" -eq 31 ] ||
   fail 'reviewed ELF ABI manifest contains duplicate symbols'
 ! grep -F '_ZN13pkgbuild_exec6detail' "$manifest" >/dev/null ||
   fail 'private detail namespace entered public ABI manifest'
@@ -24,6 +24,10 @@ grep -F '_ZN13pkgbuild_exec22seal_execution_request' "$manifest" >/dev/null ||
   fail 'execution-request projection is absent from reviewed ABI'
 grep -F '_ZN13pkgbuild_exec7execute' "$manifest" >/dev/null ||
   fail 'execute() is absent from reviewed ABI'
+grep -F '_ZN13pkgbuild_exec14execute_sealed' "$manifest" >/dev/null ||
+  fail 'execute_sealed() is absent from reviewed ABI'
+grep -F '_ZN13pkgbuild_exec23publish_sealed_artifact' "$manifest" >/dev/null ||
+  fail 'publish_sealed_artifact() is absent from reviewed ABI'
 grep -F '_ZN13pkgbuild_exec29decode_build_execution_result' "$manifest" >/dev/null ||
   fail 'durable decoder is absent from reviewed ABI'
 grep -F '_ZTIN13pkgbuild_exec5errorE' "$manifest" >/dev/null ||
@@ -34,5 +38,5 @@ grep -F -- '--version-script=' "$root/src/meson.build" >/dev/null ||
   fail 'reviewed ELF export manifest is not linked'
 grep -F "../abi/libpkgbuild-exec.exports" "$root/src/meson.build" >/dev/null ||
   fail 'Meson does not consume reviewed ABI manifest'
-grep -F '28-symbol' "$root/MAINTAINING.md" >/dev/null ||
+grep -F '31-symbol' "$root/MAINTAINING.md" >/dev/null ||
   fail 'reviewed ABI inventory is undocumented'

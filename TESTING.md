@@ -110,7 +110,10 @@ identity.
 `result-sealing` keeps successful process execution distinct from a successful
 build. It proves refusal of unsupported package-output objects, empty output,
 and an already-existing artifact destination, including non-replacement of the
-existing bytes.
+existing bytes. It also proves that sealed execution leaves the public path
+absent, that terminal evidence can publish its exact private bytes later, that
+repeated evidence-backed publication is idempotent without re-execution, and
+that differing public bytes are never adopted or replaced.
 
 ## Durable evidence protocol
 

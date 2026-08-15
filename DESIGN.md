@@ -141,20 +141,31 @@ Sockets and all unsupported object types fail result sealing.
 time at whole-second precision. The payload manifest is normalized to that
 representable precision before artifact encoding.
 
-## Artifact publication and verification
+## Artifact sealing, evidence, and publication
 
-The artifact contract writes only uncompressed `package_tar`. The archive is
-encoded
-in the destination directory under an unpublished temporary name, made
-read-only, synchronized, and hashed. Publication uses a same-filesystem hard
-link and fails if the final name already exists; existing artifact bytes are
-never replaced.
+The artifact contract writes only uncompressed `package_tar`. Successful
+execution first encodes the archive beneath the admitted private session root
+under an unpublished temporary name, makes it read-only, synchronizes it,
+hashes it, and gives it a deterministic private sealed name. `libpkgimage`
+opens those exact private bytes with the expected complete-archive digest. The
+adapter compares the normalized image to the intended payload entry by entry
+before successful build evidence exists.
 
-After publication, `libpkgimage` opens the final artifact path with the exact
-expected complete-archive digest. The adapter compares the normalized image to
-the intended payload entry by entry and verifies that the final pathname still
-names the retained inode. Any verification failure removes the newly published
-artifact and seals a failed build result.
+Caller-visible publication is a separate projection. A durable controller can
+therefore persist the terminal `build_execution_result` before exposing the
+artifact path. `publish_sealed_artifact()` reopens the private sealed bytes,
+proves they still match the retained byte count and SHA-256, copies them into
+an unpublished temporary object in the destination directory, synchronizes it,
+and publishes without replacement. If the final path already exists, present
+observation may satisfy publication only when it proves the exact bytes named
+by terminal evidence. A pathname by itself is never treated as historical
+build evidence.
+
+After successful projection the private artifact name is removed. Recovery
+after publication but before controller completion can validate the existing
+final path directly against already-durable terminal evidence; recovery before
+terminal evidence must replay the admitted build rather than infer success
+from filesystem residue.
 
 Diagnostics are retained operational evidence. Stable result-sealing failure
 identity contains only the typed failure class, not diagnostic prose or host
@@ -173,7 +184,9 @@ profile, admitted session, source materialization, package-input resource, host
 path, credential policy, or execution resource. Decode requires the exact
 `pkgbuild::build_request`, `pkgexec::execution_request`, and
 `pkgexec::backend_capability_profile` bodies from their owning authorities.
-Identity strings alone are not rehydration authority.
+Identity strings alone are not rehydration authority. Public artifact
+publication is likewise not decoding authority: decoded terminal evidence can
+authorize a later exact-byte projection without rerunning construction.
 
 Successful records retain the complete payload manifest, sealed artifact, and
 archive-inspection receipt used to restore the exact

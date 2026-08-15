@@ -1037,6 +1037,134 @@ private:
   bool owns_publication_ = false;
 };
 
+std::optional<unique_fd> open_exact_read_only_artifact(
+    const fs::path& path,
+    const std::pair<std::string, std::uint64_t>& expected,
+    bool absent_is_empty)
+{
+  unique_fd file(::open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+  if (!file) {
+    if (absent_is_empty && errno == ENOENT) {
+      return std::nullopt;
+    }
+    throw error(
+        error_code::artifact_publication_failed,
+        errno_message("open retained artifact", errno));
+  }
+
+  const file_stamp before = fstat_stamp(
+      file.get(), error_code::artifact_publication_failed,
+      "inspect retained artifact");
+  if (!S_ISREG(before.mode) || (before.mode & 0222U) != 0U) {
+    throw error(
+        error_code::artifact_publication_failed,
+        "retained artifact is not a read-only regular file");
+  }
+  const auto observed = hash_regular(
+      file.get(), before, error_code::artifact_publication_failed);
+  if (observed != expected) {
+    throw error(
+        error_code::artifact_publication_failed,
+        "retained artifact differs from durable terminal evidence");
+  }
+
+  struct stat path_info {};
+  if (::lstat(path.c_str(), &path_info) != 0) {
+    throw error(
+        error_code::artifact_publication_failed,
+        errno_message("reinspect retained artifact path", errno));
+  }
+  if (!(before == stamp_of(path_info))) {
+    throw error(
+        error_code::artifact_publication_failed,
+        "retained artifact path changed during exact verification");
+  }
+  return file;
+}
+
+void remove_private_sealed_artifact(const fs::path& path)
+{
+  struct stat value {};
+  if (::lstat(path.c_str(), &value) != 0) {
+    if (errno == ENOENT) {
+      return;
+    }
+    throw error(
+        error_code::artifact_cleanup_failed,
+        errno_message("inspect private sealed artifact", errno));
+  }
+  if (!S_ISREG(value.st_mode)) {
+    throw error(
+        error_code::artifact_cleanup_failed,
+        "private sealed artifact is no longer a regular file");
+  }
+
+  unique_fd parent(::open(
+      path.parent_path().c_str(),
+      O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW));
+  if (!parent) {
+    throw error(
+        error_code::artifact_cleanup_failed,
+        errno_message("open private artifact parent", errno));
+  }
+  if (::unlink(path.c_str()) != 0 || ::fsync(parent.get()) != 0) {
+    throw error(
+        error_code::artifact_cleanup_failed,
+        errno_message("remove private sealed artifact", errno));
+  }
+}
+
+void copy_exact_artifact(
+    int source,
+    temporary_artifact& destination,
+    const std::pair<std::string, std::uint64_t>& expected)
+{
+  if (::lseek(source, 0, SEEK_SET) < 0) {
+    throw error(
+        error_code::artifact_publication_failed,
+        errno_message("rewind private sealed artifact", errno));
+  }
+
+  std::array<unsigned char, 65536> buffer{};
+  for (;;) {
+    const ssize_t count = ::read(source, buffer.data(), buffer.size());
+    if (count < 0 && errno == EINTR) {
+      continue;
+    }
+    if (count < 0) {
+      throw error(
+          error_code::artifact_publication_failed,
+          errno_message("read private sealed artifact", errno));
+    }
+    if (count == 0) {
+      break;
+    }
+    write_all(
+        destination.descriptor(), buffer.data(),
+        static_cast<std::size_t>(count),
+        error_code::artifact_publication_failed,
+        "copy private sealed artifact");
+  }
+
+  if (::fchmod(destination.descriptor(), 0444) != 0 ||
+      ::fsync(destination.descriptor()) != 0) {
+    throw error(
+        error_code::artifact_publication_failed,
+        errno_message("seal public artifact candidate", errno));
+  }
+  const file_stamp stamp = fstat_stamp(
+      destination.descriptor(), error_code::artifact_publication_failed,
+      "inspect public artifact candidate");
+  if (!S_ISREG(stamp.mode) || (stamp.mode & 0222U) != 0U ||
+      hash_regular(
+          destination.descriptor(), stamp,
+          error_code::artifact_publication_failed) != expected) {
+    throw error(
+        error_code::artifact_publication_failed,
+        "public artifact candidate differs from retained sealed bytes");
+  }
+}
+
 unique_fd open_regular_beneath(
     int root, const pkgbuild::payload_path& path)
 {
@@ -1397,6 +1525,12 @@ prepared_paths project_prepared_paths(
   };
 }
 
+fs::path project_sealed_artifact_path(
+    const admitted_build_session& session)
+{
+  return session.paths().session_root / "sealed-artifact.tar";
+}
+
 pkgexec::execution_request seal_execution_request(
     const admitted_build_session& session)
 {
@@ -1570,8 +1704,9 @@ prepared_execution prepare(const admitted_build_session& session)
           paths.workspace, paths.temporary_root};
 }
 
-build_execution_result execute(const admitted_build_session& session,
-                               pkgexec::execution_backend& backend)
+build_execution_result execute_sealed(
+    const admitted_build_session& session,
+    pkgexec::execution_backend& backend)
 {
   const auto advertised_backend = backend_capabilities(backend);
   auto prepared = prepare(session);
@@ -1598,7 +1733,8 @@ build_execution_result execute(const admitted_build_session& session,
 
   try {
     auto payload = inspect_payload(session.paths().package_output_root);
-    temporary_artifact temporary(session.paths().artifact_path);
+    const auto sealed_path = project_sealed_artifact_path(session);
+    temporary_artifact temporary(sealed_path);
     encode_artifact(payload, session.paths().package_output_root, temporary);
     auto after_encoding = inspect_payload(session.paths().package_output_root);
     if (!(payload.root_stamp == after_encoding.root_stamp) ||
@@ -1608,20 +1744,20 @@ build_execution_result execute(const admitted_build_session& session,
     }
     const auto artifact_digest = hash_artifact(temporary.descriptor());
 
-    temporary.publish(session.paths().artifact_path, artifact_digest);
+    temporary.publish(sealed_path, artifact_digest);
 
     try {
       pkgimage::libarchive_backend image_backend;
       const auto before = fstat_stamp(
           temporary.descriptor(), error_code::artifact_verification_failed,
-          "inspect published artifact before image verification");
+          "inspect sealed artifact before image verification");
       auto inspected = image_backend.inspect(
           pkgimage::archive_inspection_request{
-              session.paths().artifact_path,
+              sealed_path,
               image_digest(artifact_digest.first)});
       const auto after = fstat_stamp(
           temporary.descriptor(), error_code::artifact_verification_failed,
-          "inspect published artifact after image verification");
+          "inspect sealed artifact after image verification");
       if (!(before == after)) {
         throw error(error_code::artifact_verification_failed,
                     "artifact bytes changed during independent inspection");
@@ -1662,6 +1798,79 @@ build_execution_result execute(const admitted_build_session& session,
         session.request(), evidence, detail::sealing_failure_identity(execution, kind));
     return detail::executor_access::make(
         std::move(execution), std::move(build), kind, value.what(),
+        std::nullopt);
+  }
+}
+
+void publish_sealed_artifact(
+    const admitted_build_session& session,
+    const build_execution_result& result)
+{
+  if (result.build().outcome() != pkgbuild::build_outcome::succeeded ||
+      !result.build().artifact() || !result.image_authority() ||
+      result.sealing_failure()) {
+    throw error(
+        error_code::artifact_publication_failed,
+        "only a successful sealed build result can publish an artifact");
+  }
+  if (result.build().request().identity() != session.request().identity() ||
+      result.execution().request() != seal_execution_request(session)) {
+    throw error(
+        error_code::artifact_publication_failed,
+        "sealed artifact result belongs to another admitted build session");
+  }
+
+  const auto& artifact = *result.build().artifact();
+  const std::pair<std::string, std::uint64_t> expected{
+      artifact.complete_digest().hex(), artifact.byte_count()};
+  const auto private_path = project_sealed_artifact_path(session);
+  const auto public_path = session.paths().artifact_path;
+
+  if (auto published = open_exact_read_only_artifact(
+          public_path, expected, true)) {
+    remove_private_sealed_artifact(private_path);
+    return;
+  }
+
+  auto retained = open_exact_read_only_artifact(
+      private_path, expected, false);
+  if (!retained) {
+    throw error(
+        error_code::artifact_publication_failed,
+        "durable terminal evidence lacks its private sealed artifact");
+  }
+
+  temporary_artifact publication(public_path);
+  copy_exact_artifact(retained->get(), publication, expected);
+  publication.publish(public_path, expected);
+  publication.verify_published_binding();
+  publication.retain();
+  remove_private_sealed_artifact(private_path);
+}
+
+build_execution_result execute(
+    const admitted_build_session& session,
+    pkgexec::execution_backend& backend)
+{
+  auto result = execute_sealed(session, backend);
+  if (result.build().outcome() != pkgbuild::build_outcome::succeeded) {
+    return result;
+  }
+
+  try {
+    publish_sealed_artifact(session, result);
+    return result;
+  } catch (const error& value) {
+    const auto kind = failure_kind(value.code());
+    if (!kind) {
+      throw;
+    }
+    const auto evidence = detail::execution_evidence_identity(result.execution());
+    auto build = pkgbuild::build_result::failed(
+        session.request(), evidence,
+        detail::sealing_failure_identity(result.execution(), *kind));
+    return detail::executor_access::make(
+        result.execution(), std::move(build), *kind, value.what(),
         std::nullopt);
   }
 }

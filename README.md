@@ -1,4 +1,4 @@
-# libpkgbuild-exec 3.0.1
+# libpkgbuild-exec 3.1.0
 
 `libpkgbuild-exec` is the native build-execution adapter for Zeppe-Lin.
 It realizes one sealed `libpkgbuild` request through a caller-supplied,
@@ -22,10 +22,15 @@ check composition recover exact request and resource coordinates without
 deleting or recreating a workspace.
 
 The effectful path stages each verified source again under its exact declared
-`local_name`, requests denied-network execution, retains the complete execution result,
-inspects the package output root, writes an uncompressed `package_tar`,
-publishes without replacing an existing artifact, asks `libpkgimage` to reopen and inspect the published bytes, and delegates
-build/image equality to `libpkgbuild-image` before build success is retained.
+`local_name`, requests denied-network execution, retains the complete execution
+result, inspects the package output root, and writes an uncompressed
+`package_tar`. `execute_sealed()` keeps the exact read-only archive beneath the
+admitted private session root, asks `libpkgimage` to inspect those sealed bytes,
+and delegates build/image equality to `libpkgbuild-image` before build success
+is retained. `publish_sealed_artifact()` later projects only those retained
+bytes to the caller artifact path without replacement. The one-shot
+`execute()` convenience performs both phases for callers that do not need a
+durable boundary between terminal evidence and public publication.
 
 The library does not fetch sources, extract archives, discover collections,
 resolve dependencies, construct a Linux backend, install packages, execute

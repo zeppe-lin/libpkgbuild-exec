@@ -1,3 +1,19 @@
+Version: 3.1.0
+Date: 2026-08-15
+
+- Split successful artifact sealing from caller-visible publication so a
+  durable controller can persist terminal build evidence before exposing the
+  final artifact name.
+- Retain the verified package archive beneath the admitted session root until
+  `publish_sealed_artifact()` projects those exact bytes to the public
+  artifact path.
+- Make evidence-backed publication idempotent without re-executing the build:
+  an existing final path is accepted only when present observation proves the
+  exact byte count and SHA-256 retained by terminal build evidence.
+- Preserve one-shot `execute()` as execute/seal/publish convenience and keep
+  the generation-3 SONAME; this is an additive API release with unchanged
+  public carrier layouts.
+
 Version: 3.0.1
 
 - Treat an already-published artifact as an idempotent publication only when a

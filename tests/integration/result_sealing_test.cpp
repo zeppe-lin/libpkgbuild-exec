@@ -88,6 +88,68 @@ void exact_publication_is_idempotent()
           "exact replay replaced retained artifact bytes");
 }
 
+void sealed_execution_defers_publication()
+{
+  fixture_owner owner("sealed-before-publication");
+  fixture_backend backend(backend_mode::succeed);
+  const auto session = owner.get().session();
+  const auto private_path =
+      pkgbuild_exec::project_sealed_artifact_path(session);
+  const auto result = pkgbuild_exec::execute_sealed(session, backend);
+
+  require(result.build().outcome() == pkgbuild::build_outcome::succeeded &&
+              result.build().artifact() && result.image_authority(),
+          "private sealing did not retain successful build evidence");
+  require(fs::is_regular_file(private_path),
+          "private sealing did not retain exact artifact bytes");
+  require(!fs::exists(session.paths().artifact_path),
+          "private sealing published caller-visible artifact bytes early");
+
+  pkgbuild_exec::publish_sealed_artifact(session, result);
+  require(fs::is_regular_file(session.paths().artifact_path),
+          "terminal result did not publish its retained artifact");
+  require(!fs::exists(private_path),
+          "successful publication retained redundant private artifact name");
+}
+
+void retained_result_publication_is_idempotent()
+{
+  fixture_owner owner("retained-result-publication");
+  fixture_backend backend(backend_mode::succeed);
+  const auto session = owner.get().session();
+  const auto result = pkgbuild_exec::execute_sealed(session, backend);
+  pkgbuild_exec::publish_sealed_artifact(session, result);
+  const auto retained = read_file(session.paths().artifact_path);
+
+  pkgbuild_exec::publish_sealed_artifact(session, result);
+  require(read_file(session.paths().artifact_path) == retained,
+          "evidence-backed publication replaced exact retained bytes");
+}
+
+void retained_result_refuses_different_publication()
+{
+  fixture_owner owner("retained-result-conflict");
+  fixture_backend backend(backend_mode::succeed);
+  const auto session = owner.get().session();
+  const auto result = pkgbuild_exec::execute_sealed(session, backend);
+  write_file(session.paths().artifact_path, "different artifact\n", 0444);
+
+  bool refused = false;
+  try {
+    pkgbuild_exec::publish_sealed_artifact(session, result);
+  } catch (const pkgbuild_exec::error& problem) {
+    refused = problem.code() ==
+        pkgbuild_exec::error_code::artifact_publication_failed;
+  }
+  require(refused,
+          "terminal evidence accepted different public artifact bytes");
+  require(read_file(session.paths().artifact_path) == "different artifact\n",
+          "terminal evidence replaced conflicting public artifact bytes");
+  require(fs::is_regular_file(
+              pkgbuild_exec::project_sealed_artifact_path(session)),
+          "publication conflict discarded retryable private sealed bytes");
+}
+
 void large_payload_is_descriptor_bounded()
 {
   fixture_owner owner("large-payload");
@@ -137,6 +199,9 @@ int main()
   try {
     publication_is_non_replacing();
     exact_publication_is_idempotent();
+    sealed_execution_defers_publication();
+    retained_result_publication_is_idempotent();
+    retained_result_refuses_different_publication();
     large_payload_is_descriptor_bounded();
     unsupported_output_object_fails_payload_inspection();
     empty_output_fails_payload_inspection();
