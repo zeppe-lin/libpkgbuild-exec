@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -eu
 build_root=${1:?build root required}
+expected_version=${2:?expected project version required}
 metadata=$build_root/meson-private/libpkgbuild-exec.pc
 fail()
 {
@@ -22,7 +23,7 @@ test -n "${metadata:-}" && test -s "$metadata" ||
 name=$(sed -n 's/^Name:[[:space:]]*//p' "$metadata")
 test "$name" = libpkgbuild-exec || fail "module name is '$name'"
 version=$(sed -n 's/^Version:[[:space:]]*//p' "$metadata")
-test "$version" = 3.2.0 || fail "module version is '$version'"
+test "$version" = "$expected_version" || fail "module version is '$version', expected '$expected_version'"
 normalize_requirements()
 {
   sed \
@@ -59,12 +60,15 @@ requires_private=$(sed -n 's/^Requires\.private:[[:space:]]*//p' "$metadata" |
   tr ',' '\n' | normalize_requirements)
 expected_private='libpkgsource >= 4.0.0
 libpkgsource < 5.0.0
+libpkgsource-exec >= 0.1.0
+libpkgsource-exec < 1.0.0
 libpkgimage >= 0.4.0
 libpkgimage < 1.0.0
 libarchive
 libcrypto'
 for requirement in \
   'libpkgsource >= 4.0.0' 'libpkgsource < 5.0.0' \
+  'libpkgsource-exec >= 0.1.0' 'libpkgsource-exec < 1.0.0' \
   'libpkgimage >= 0.4.0' 'libpkgimage < 1.0.0' libarchive libcrypto
 do
   count=$(printf '%s\n' "$requires_private" | grep -Fxc "$requirement" || true)

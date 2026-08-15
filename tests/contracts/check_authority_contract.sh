@@ -36,12 +36,12 @@ grep -q 'without touching host resources' "$executor_api"
 grep -q 'pkgbuild::image_adapter::build_image_authority' "$api"
 ! grep -R -q 'libpkgexec-linux' "$root/include" "$root/src" "$meson"
 
-# Source admission is byte-based, not pathname-shaped authority.
-grep -q 'O_NOFOLLOW' "$executor"
-grep -q 'object.byte_count()' "$executor"
-grep -q 'object.observed_digest()' "$executor"
-grep -q 'object.declaration().content_digest()' "$executor"
-grep -q 'fchmod(destination.get(), 0444)' "$executor"
+# Raw source-object realization is delegated to the phase-neutral provider.
+grep -q '#include <libpkgsource-exec/libpkgsource-exec.h>' "$executor"
+grep -q 'pkgsource_exec::source_object_tree_identity(materialization)' "$executor"
+grep -q 'pkgsource_exec::realize_source_object_tree(materialization' "$executor"
+grep -q 'cannot realize source-object resource:' "$executor"
+! grep -q 'stage_source_object(' "$executor"
 
 # Builds receive denied networking and explicit resources.
 grep -q 'network_policy::denied' "$executor"
