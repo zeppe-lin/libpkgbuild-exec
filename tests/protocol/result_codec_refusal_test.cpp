@@ -15,7 +15,7 @@ using namespace pkgbuild_exec_test;
 pkgbuild::build_request different_build_request(
     const fixture_owner::state& state)
 {
-  return build_request(state.resolution, 5);
+  return build_request(state.resolution, 5, 0022, 1700000000);
 }
 
 void rejects_corrupt_bytes()

@@ -100,7 +100,8 @@ expansion, when declared, occurs only in the writable build workspace.
 
 `source-archive` attacks the concrete libarchive implementation independently of
 normal preparation. It proves safe relative symlinks and already-extracted
-hardlinks, deterministic metadata/umask handling, and fail-closed refusal of
+hardlinks, deterministic metadata/umask handling under an explicit non-house
+mask, and fail-closed refusal of
 absolute or dot-dot paths, escaping symlinks/hardlinks, forward hardlinks,
 duplicate entries, parent/non-directory collisions, unsupported object types,
 raw data, and empty archives. Source extraction is never allowed to discover

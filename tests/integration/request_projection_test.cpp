@@ -58,7 +58,7 @@ void require_exact_guarantees(const pkgexec::execution_request& request)
 
 void projects_exact_build_contract()
 {
-  fixture_owner owner("projection");
+  fixture_owner owner("projection", "source bytes\n", {}, 0027);
   const auto session = owner.get().session();
   const auto request = pkgbuild_exec::seal_execution_request(session);
   const auto paths = pkgbuild_exec::project_prepared_paths(session);

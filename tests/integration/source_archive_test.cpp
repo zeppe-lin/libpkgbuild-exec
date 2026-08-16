@@ -34,7 +34,7 @@ void realizes_safe_link_algebra()
       {"tree/link", AE_IFLNK, 0777, {}, "value", {}, 102},
       {"tree/hard", AE_IFREG, 0777, {}, {}, "tree/value", 103},
   });
-  fixture_owner owner("archive-links", "source bytes\n", bytes);
+  fixture_owner owner("archive-links", "source bytes\n", bytes, 0027);
   const auto prepared = pkgbuild_exec::prepare(owner.get().session("links"));
   const auto tree = prepared.workspace / "tree";
   require(read_file(tree / "value") == "payload\n",
@@ -49,7 +49,7 @@ void realizes_safe_link_algebra()
               ::stat((tree / "hard").c_str(), &hard) == 0 &&
               value.st_dev == hard.st_dev && value.st_ino == hard.st_ino,
           "safe source archive hard link lost inode identity");
-  require((value.st_mode & 07777U) == 0755U && value.st_mtim.tv_sec == 101,
+  require((value.st_mode & 07777U) == 0750U && value.st_mtim.tv_sec == 101,
           "source archive regular metadata escaped build umask/mtime authority");
   require(::lstat((tree / "link").c_str(), &link) == 0 &&
               S_ISLNK(link.st_mode) && link.st_mtim.tv_sec == 102,

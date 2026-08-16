@@ -7,6 +7,7 @@
 #include <array>
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -185,13 +186,15 @@ inline const pkgresolve::selected_package& subject(
 
 inline pkgbuild::build_request build_request(
     const pkgresolve::resolution_result& resolved,
-    std::uint32_t parallelism = 4)
+    std::uint32_t parallelism,
+    std::uint32_t file_creation_mask,
+    std::optional<std::int64_t> source_date_epoch)
 {
   return pkgbuild::build_request::seal(
       resolved, subject(resolved).identity(),
       pkgbuild::build_policy::make(
           pkgbuild::environment_policy::hermetic(
-              parallelism, 0027, 1700000000)));
+              parallelism, file_creation_mask, source_date_epoch)));
 }
 
 inline std::string environment_value(
