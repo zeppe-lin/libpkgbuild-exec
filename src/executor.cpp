@@ -405,10 +405,17 @@ struct inode_key final {
   }
 };
 
-pkgbuild::payload_time payload_time(const file_stamp& value)
+pkgbuild::payload_time payload_time(
+    const file_stamp& value,
+    const std::optional<std::int64_t>& source_date_epoch)
 {
-  // package_tar uses the restricted pax profile and therefore seals
-  // modification times at whole-second precision.
+  // SOURCE_DATE_EPOCH is admitted build policy, not merely process
+  // environment decoration. When present it closes package-image timestamp
+  // authority so wall-clock filesystem mtimes cannot enter the payload or
+  // archive identity. package_tar uses whole-second precision.
+  if (source_date_epoch) {
+    return {*source_date_epoch, 0U};
+  }
   return {static_cast<std::int64_t>(value.modification.tv_sec), 0U};
 }
 
@@ -517,7 +524,8 @@ void inspect_directory(
     int directory, const std::string& prefix,
     std::vector<pkgbuild::payload_entry>& entries,
     std::vector<retained_regular>& regulars,
-    std::map<inode_key, pkgbuild::payload_path>& hardlink_targets)
+    std::map<inode_key, pkgbuild::payload_path>& hardlink_targets,
+    const std::optional<std::int64_t>& source_date_epoch)
 {
   const file_stamp directory_before = fstat_stamp(
       directory, error_code::payload_inspection_failed,
@@ -538,7 +546,7 @@ void inspect_directory(
         static_cast<std::uint32_t>(before.mode & 07777U);
     const std::uint64_t user = static_cast<std::uint64_t>(before.user);
     const std::uint64_t group = static_cast<std::uint64_t>(before.group);
-    const auto modification = payload_time(before);
+    const auto modification = payload_time(before, source_date_epoch);
 
     if (S_ISDIR(before.mode)) {
       unique_fd child(::openat(directory, name.c_str(),
@@ -556,7 +564,7 @@ void inspect_directory(
       entries.push_back(pkgbuild::payload_entry::directory(
           path, mode, user, group, modification));
       inspect_directory(child.get(), relative, entries, regulars,
-                        hardlink_targets);
+                        hardlink_targets, source_date_epoch);
       if (!(before == fstat_stamp(child.get(),
                                   error_code::payload_inspection_failed,
                                   "reinspect traversed package directory"))) {
@@ -666,7 +674,9 @@ void inspect_directory(
   }
 }
 
-inspected_payload inspect_payload(const fs::path& root)
+inspected_payload inspect_payload(
+    const fs::path& root,
+    const std::optional<std::int64_t>& source_date_epoch)
 {
   unique_fd directory(::open(root.c_str(),
                               O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW));
@@ -677,7 +687,8 @@ inspected_payload inspect_payload(const fs::path& root)
   std::vector<pkgbuild::payload_entry> entries;
   std::vector<retained_regular> regulars;
   std::map<inode_key, pkgbuild::payload_path> hardlinks;
-  inspect_directory(directory.get(), {}, entries, regulars, hardlinks);
+  inspect_directory(directory.get(), {}, entries, regulars, hardlinks,
+                    source_date_epoch);
   if (entries.empty()) {
     throw error(error_code::payload_inspection_failed,
                 "package output root contains no explicit payload entries");
@@ -1672,11 +1683,15 @@ build_execution_result execute_sealed(
   }
 
   try {
-    auto payload = inspect_payload(session.paths().package_output_root);
+    const auto& source_date_epoch =
+        session.request().policy().environment().source_date_epoch();
+    auto payload = inspect_payload(session.paths().package_output_root,
+                                   source_date_epoch);
     const auto sealed_path = project_sealed_artifact_path(session);
     temporary_artifact temporary(sealed_path);
     encode_artifact(payload, session.paths().package_output_root, temporary);
-    auto after_encoding = inspect_payload(session.paths().package_output_root);
+    auto after_encoding = inspect_payload(session.paths().package_output_root,
+                                          source_date_epoch);
     if (!(payload.root_stamp == after_encoding.root_stamp) ||
         payload.manifest != after_encoding.manifest) {
       throw error(error_code::artifact_encoding_failed,

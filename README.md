@@ -31,7 +31,10 @@ materialization evidence.
 
 The effectful path requests denied-network execution, retains the complete
 execution result, inspects the package output root, and writes an uncompressed
-`package_tar`. `execute_sealed()` keeps the exact read-only archive beneath the
+`package_tar`. When `SOURCE_DATE_EPOCH` is present in the admitted build policy,
+result sealing canonicalizes every package-image entry mtime to that exact epoch
+at whole-second precision; transient wall-clock mtimes in the package output root
+therefore cannot enter payload or archive identity. `execute_sealed()` keeps the exact read-only archive beneath the
 admitted private session root, asks `libpkgimage` to inspect those sealed bytes,
 and delegates build/image equality to `libpkgbuild-image` before build success
 is retained. `publish_sealed_artifact()` later projects only those retained

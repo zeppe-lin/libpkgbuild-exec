@@ -82,21 +82,44 @@ void seals_complete_success()
           "independent image authority is not bound to the successful build");
 }
 
-void effect_paths_do_not_change_build_identity_or_artifact_bytes()
+
+void absent_source_date_epoch_preserves_observed_timestamp()
+{
+  fixture_owner owner("success-observed-mtime", "source bytes\n", {}, 0022,
+                      std::nullopt);
+  fixture_backend backend(backend_mode::succeed, 1700000101);
+  const auto result = pkgbuild_exec::execute(owner.get().session(), backend);
+
+  for (const auto& value : result.build().payload()->entries()) {
+    require(value.modification_time().seconds == 1700000101 &&
+                value.modification_time().nanoseconds == 0U,
+            "absent SOURCE_DATE_EPOCH did not preserve observed payload time");
+  }
+}
+
+void source_date_epoch_closes_output_timestamp_authority()
 {
   fixture_owner owner("success-determinism");
-  fixture_backend backend(backend_mode::succeed);
-  const auto first = pkgbuild_exec::execute(owner.get().session("first"), backend);
-  const auto second = pkgbuild_exec::execute(owner.get().session("second"), backend);
+  fixture_backend first_backend(backend_mode::succeed, 1700000101);
+  fixture_backend second_backend(backend_mode::succeed, 1800000202);
+  const auto first =
+      pkgbuild_exec::execute(owner.get().session("first"), first_backend);
+  const auto second =
+      pkgbuild_exec::execute(owner.get().session("second"), second_backend);
 
+  for (const auto& value : first.build().payload()->entries()) {
+    require(value.modification_time().seconds == 1700000000 &&
+                value.modification_time().nanoseconds == 0U,
+            "SOURCE_DATE_EPOCH did not close payload timestamp authority");
+  }
   require(first.build() == second.build(),
-          "effect coordinates contaminated build-result identity");
+          "wall-clock output mtimes contaminated build-result identity");
   require(first.build().artifact()->complete_digest() ==
               second.build().artifact()->complete_digest(),
-          "effect coordinates changed artifact authority");
+          "wall-clock output mtimes changed artifact authority");
   require(read_file(owner.get().root / "artifact-first.tar") ==
               read_file(owner.get().root / "artifact-second.tar"),
-          "identical payloads produced different package_tar bytes");
+          "wall-clock output mtimes changed package_tar bytes");
 }
 
 } // namespace
@@ -105,7 +128,8 @@ int main()
 {
   try {
     seals_complete_success();
-    effect_paths_do_not_change_build_identity_or_artifact_bytes();
+    absent_source_date_epoch_preserves_observed_timestamp();
+    source_date_epoch_closes_output_timestamp_authority();
   } catch (const std::exception& value) {
     std::cerr << value.what() << '\n';
     return 1;

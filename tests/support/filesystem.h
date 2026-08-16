@@ -4,6 +4,7 @@
 
 #include "test.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -38,10 +39,12 @@ inline std::string read_file(const fs::path& path)
           std::istreambuf_iterator<char>()};
 }
 
-inline void set_mtime(const fs::path& path, bool symlink = false)
+inline void set_mtime(const fs::path& path, bool symlink = false,
+                      std::int64_t seconds = 1700000000,
+                      long nanoseconds = 123456789)
 {
-  const timespec value[2]{{1700000000, 123456789},
-                          {1700000000, 123456789}};
+  const timespec value[2]{{static_cast<time_t>(seconds), nanoseconds},
+                          {static_cast<time_t>(seconds), nanoseconds}};
   require(::utimensat(AT_FDCWD, path.c_str(), value,
                       symlink ? AT_SYMLINK_NOFOLLOW : 0) == 0,
           "cannot set fixture mtime");

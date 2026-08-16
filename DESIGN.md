@@ -146,6 +146,11 @@ and manifest. Descriptor use is therefore bounded by path depth while pathname,
 metadata, content, hard-link, and directory replacement remain fail-closed.
 Sockets and all unsupported object types fail result sealing.
 
+An admitted `SOURCE_DATE_EPOCH` closes package-image timestamp authority during
+result sealing: every payload/archive entry is canonicalized to that exact epoch
+at whole-second precision, while the transient package-output tree remains only
+guarded encoding material.
+
 `package_tar` uses restricted pax and therefore represents modification
 time at whole-second precision. The payload manifest is normalized to that
 representable precision before artifact encoding.

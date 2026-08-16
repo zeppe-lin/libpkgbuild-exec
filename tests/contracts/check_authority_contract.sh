@@ -99,6 +99,10 @@ grep -q 'build_image_authority::admit' "$executor"
 ! grep -q 'void verify_image' "$executor"
 grep -q 'open_regular_beneath' "$executor"
 grep -q 'package payload changed during archive encoding' "$executor"
+grep -F 'environment().source_date_epoch()' "$executor" >/dev/null
+grep -F 'payload_time(before, source_date_epoch)' "$executor" >/dev/null
+grep -q 'source_date_epoch_closes_output_timestamp_authority' \
+  "$root/tests/integration/execution_success_test.cpp"
 grep -q 'large_payload_is_descriptor_bounded' \
   "$root/tests/integration/result_sealing_test.cpp"
 grep -q 'sealed_execution_defers_publication' \

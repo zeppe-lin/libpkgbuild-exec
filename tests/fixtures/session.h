@@ -173,7 +173,8 @@ public:
       std::string suffix,
       std::string payload_bytes = "source bytes\n",
       std::string archive_bytes = {},
-      std::uint32_t file_creation_mask = 0022)
+      std::uint32_t file_creation_mask = 0022,
+      std::optional<std::int64_t> source_date_epoch = 1700000000)
   {
     if (archive_bytes.empty()) {
       archive_bytes = archive_fixture_bytes();
@@ -196,7 +197,8 @@ public:
 
     auto resolved = resolution(sha256_text(payload_bytes),
                                sha256_text(archive_bytes));
-    auto request = build_request(resolved, 4, file_creation_mask, 1700000000);
+    auto request = build_request(resolved, 4, file_creation_mask,
+                                 source_date_epoch);
     auto source = request.source();
     auto materialization = pkgfetch::materialize(
         pkgfetch::materialization_request::seal(

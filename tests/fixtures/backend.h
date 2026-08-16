@@ -5,6 +5,7 @@
 #include "../support/filesystem.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 
 #include <sys/socket.h>
@@ -51,7 +52,11 @@ enum class backend_mode {
 
 class fixture_backend final : public pkgexec::execution_backend {
 public:
-  explicit fixture_backend(backend_mode mode) : mode_(mode) {}
+  explicit fixture_backend(backend_mode mode,
+                           std::int64_t payload_mtime = 1700000000)
+      : mode_(mode), payload_mtime_(payload_mtime)
+  {
+  }
 
   pkgexec::backend_capability_profile capabilities() const override
   {
@@ -94,7 +99,7 @@ public:
     if (mode_ != backend_mode::empty_payload) {
       emit_payload(output_path(request, resources),
                    mode_ == backend_mode::unsupported_payload,
-                   mode_ == backend_mode::large_payload);
+                   mode_ == backend_mode::large_payload, payload_mtime_);
     }
 
     auto evidence_request = request;
@@ -128,7 +133,7 @@ private:
   }
 
   static void emit_payload(const fs::path& root, bool unsupported,
-                           bool large)
+                           bool large, std::int64_t payload_mtime)
   {
     fs::create_directories(root / "usr/bin");
     write_file(root / "usr/bin/payload", "artifact bytes\n", 0755);
@@ -147,9 +152,9 @@ private:
         const auto header =
             root / "usr/include" / ("header-" + std::to_string(index) + ".h");
         write_file(header, "/* fixture header */\n", 0644);
-        set_mtime(header);
+        set_mtime(header, false, payload_mtime);
       }
-      set_mtime(root / "usr/include");
+      set_mtime(root / "usr/include", false, payload_mtime);
     }
 
     if (unsupported) {
@@ -167,18 +172,19 @@ private:
       require(::close(descriptor) == 0, "cannot close fixture socket");
     }
 
-    set_mtime(root / "usr/bin/payload");
-    set_mtime(root / "usr/bin/payload-hard");
-    set_mtime(root / "usr/bin/payload-link", true);
-    set_mtime(root / "usr/bin/pipe");
+    set_mtime(root / "usr/bin/payload", false, payload_mtime);
+    set_mtime(root / "usr/bin/payload-hard", false, payload_mtime);
+    set_mtime(root / "usr/bin/payload-link", true, payload_mtime);
+    set_mtime(root / "usr/bin/pipe", false, payload_mtime);
     if (unsupported) {
-      set_mtime(root / "usr/bin/socket");
+      set_mtime(root / "usr/bin/socket", false, payload_mtime);
     }
-    set_mtime(root / "usr/bin");
-    set_mtime(root / "usr");
+    set_mtime(root / "usr/bin", false, payload_mtime);
+    set_mtime(root / "usr", false, payload_mtime);
   }
 
   backend_mode mode_;
+  std::int64_t payload_mtime_;
 };
 
 } // namespace pkgbuild_exec_test

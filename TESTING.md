@@ -121,7 +121,8 @@ artifact evidence.
 
 `execution-success` proves complete process evidence, payload inspection,
 hard-link and symlink topology, FIFO retention, deterministic uncompressed
-package-tar bytes, read-only non-replacing publication, independent
+package-tar bytes under hostile differing output mtimes, exact SOURCE_DATE_EPOCH
+canonicalization, read-only non-replacing publication, independent
 `libpkgimage` inspection, and effect-coordinate independence of final build
 identity.
 

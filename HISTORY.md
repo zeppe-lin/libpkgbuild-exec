@@ -1,3 +1,13 @@
+Unreleased
+
+- Treat an admitted `SOURCE_DATE_EPOCH` as package-image timestamp authority, not
+  only as an execution-environment variable. Successful result sealing now
+  canonicalizes every payload/archive entry mtime to the admitted epoch while
+  retaining the transient package tree only as guarded encoding material.
+- Strengthen deterministic artifact qualification by making two otherwise
+  identical backend executions emit deliberately different wall-clock output
+  mtimes and requiring identical payload, build, and `package_tar` authority.
+
 Version: 3.3.0
 Date: 2026-08-15
 
