@@ -78,14 +78,23 @@ void projects_exact_build_contract()
   require(request.interpreter() == session.identity().interpreter &&
               request.root_view() == session.paths().root_view,
           "execution identity projection changed");
-  require(request.environment().network() == pkgexec::network_policy::denied &&
+  require(request.environment().locale() == pkgexec::locale_policy::c_utf8 &&
+              request.environment().timezone() == pkgexec::timezone_policy::utc &&
+              request.environment().home() == pkgexec::home_policy::isolated &&
+              request.environment().network() == pkgexec::network_policy::denied &&
+              request.environment().parallelism() == 4U &&
+              request.environment().file_creation_mask() == 0027 &&
+              request.environment().source_date_epoch() == 1700000000 &&
+              request.environment().home_directory().string() ==
+                  "/build/work/home" &&
+              request.environment().temporary_directory().string() == "/tmp" &&
               request.environment().standard_input() ==
                   pkgexec::stdin_policy::null_device &&
               request.environment().standard_output() ==
                   pkgexec::stream_policy::capture_complete &&
               request.environment().standard_error() ==
                   pkgexec::stream_policy::capture_complete,
-          "non-interactive build process policy changed");
+          "closed build environment policy projection changed");
   require(environment_value(request.environment(), "PKG_SOURCE_ROOT") ==
               "/build/source" &&
               environment_value(request.environment(), "PKG_BUILD_ROOT") ==

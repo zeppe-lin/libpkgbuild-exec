@@ -79,6 +79,11 @@ selection belongs to orchestration; the fixture backend returns real sealed
   canonical package name;
 - the required guarantee set is exactly the policy derived from the sealed
   request;
+- one non-default whole-policy witness proves exact C.UTF-8/UTC/isolated-HOME/
+  denied-network invariants plus admitted parallelism, umask, source-date epoch,
+  home/tmp coordinates, closed input, complete output capture, and `PKG_JOBS`
+  projection; the adapter therefore cannot silently replace one policy dimension
+  with a private default;
 - no limits or cancellation policy are invented;
 - session, artifact, and package-input host paths do not enter semantic request
   identity;

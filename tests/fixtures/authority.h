@@ -191,7 +191,7 @@ inline pkgbuild::build_request build_request(
       resolved, subject(resolved).identity(),
       pkgbuild::build_policy::make(
           pkgbuild::environment_policy::hermetic(
-              parallelism, 0022, 1700000000)));
+              parallelism, 0027, 1700000000)));
 }
 
 inline std::string environment_value(

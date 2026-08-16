@@ -47,6 +47,15 @@ grep -q 'cannot realize source-object resource:' "$executor"
 
 # Builds receive denied networking and explicit resources.
 grep -q 'network_policy::denied' "$executor"
+for required in \
+  'policy.parallelism()' \
+  'policy.file_creation_mask()' \
+  'policy.source_date_epoch()'; do
+  grep -F -- "$required" "$executor" >/dev/null || {
+    echo "build environment projection omits admitted policy dimension: $required" >&2
+    exit 1
+  }
+done
 grep -q 'resource_role::source_tree' "$executor"
 grep -q 'resource_role::build_input_tree' "$executor"
 ! grep -q 'resource_role::check_input_tree' "$executor" || {
