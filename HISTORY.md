@@ -1,4 +1,5 @@
-Unreleased
+Version: 3.3.1
+Date: 2026-08-17
 
 - Treat an admitted `SOURCE_DATE_EPOCH` as package-image timestamp authority, not
   only as an execution-environment variable. Successful result sealing now
@@ -7,6 +8,9 @@ Unreleased
 - Strengthen deterministic artifact qualification by making two otherwise
   identical backend executions emit deliberately different wall-clock output
   mtimes and requiring identical payload, build, and `package_tar` authority.
+- Preserve `libpkgbuild-exec.so.3` and the public ABI. This release closes
+  adapter-owned package-metadata nondeterminism; it does not claim that arbitrary
+  upstream build payloads are bit-for-bit reproducible.
 
 Version: 3.3.0
 Date: 2026-08-15
